@@ -1,0 +1,24 @@
+@startuml
+
+participant OBC
+activate OBC
+OBC -> SM as "Security Manager": SA status request PDU \n tag = 00011111, length, SPI
+activate SM
+SM -> SAM as "SA Manager": get SA with SPI
+activate SAM
+alt SA found
+   SAM --> SM: SA
+   SM -> SAM: get last state transition for SA
+   alt previous transition found
+      SAM --> SM: transition
+   else 
+      SAM --> SM: SA state
+   end
+   deactivate SAM
+   SM -> SL as "Security Log": SA status request success (SPI)
+else SA not found
+   SM -> SL: SA status request fail (SPI not applicable)
+end
+SM -> OBC: SA status request reply PDU \n tag = 10011111, length, SPI, most recent state transition directive
+deactivate SM
+@enduml

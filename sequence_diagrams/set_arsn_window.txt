@@ -1,0 +1,17 @@
+@startuml
+
+participant OBC
+OBC -> SM as "Security Manager": set ARSN Window PDU \n tag = 00010101, length, SPI, new ARC window
+activate SM
+SM -> SAM as "SA Manager": get SA with SPI
+activate SAM
+alt SA found
+   SAM --> SM: SA
+   SM -> SAM: set ARC window to new ARC window value
+   deactivate SAM
+   SM -> SL as "Security Log": set ARSN window success (SPI, ARSN window)
+else SA not found
+   SM -> SL: set ARSn window fail (SPI not applicable)
+end
+deactivate SM 
+ @enduml

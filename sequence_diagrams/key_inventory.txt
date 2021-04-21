@@ -1,0 +1,15 @@
+@startuml
+
+participant OBC
+OBC -> SM as "Security Manager": key inventory PDU \n tag = 00000111, length, firstKey ID, lastKey ID
+activate SM
+SM -> KM as "Key Manager": firstKey ID, lastKey ID
+activate KM
+KM --> SM: number of keys in range
+KM --> SM: key ID and state for identified keys
+deactivate KM
+SM -> SL as "Security Log": key inventory (firstKey ID, lastKey ID, number of keys, keyIDs and states)
+SM -> OBC: key inventory reply PDU \n tag = 10000111, length, number of keys, [keyID, keyState]+
+deactivate SM
+
+@enduml

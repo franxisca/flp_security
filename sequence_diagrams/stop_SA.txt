@@ -1,0 +1,23 @@
+@startuml
+
+participant OBC
+OBC -> SM as "Security Manager": stop SA PDU \n tag = 00011110, length, SPI
+activate SM
+SM -> SAM as "SA Manager": get SA with SPI
+activate SAM
+alt SA found
+   SAM --> SM: SA
+   alt SA state = OPERATIONAL
+      SM -> SAM: remove all GVC/GMAP ID(s) from SA
+      SM -> SAM: state = KEYED for SA
+      deactivate SAM
+      SM -> SL as "Security Log": stop SA success (SPI)
+   else SA not OPERATIONAL
+      SM -> SL: stop SA fail (SA not OPERATIONAL)
+   end
+else SA not found
+   SM -> SL: stop SA fail (SPI not applicable)
+end
+deactivate SM
+
+@enduml

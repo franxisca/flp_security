@@ -1,0 +1,14 @@
+@startuml
+
+participant OBC
+activate OBC
+OBC -> SM as "Security Manager": dump log PDU \n tag = 00110011, length = 0
+activate SM
+SM -> SL as "Security Log": get log
+activate SL
+SL --> SM: comprise entire list of log security messages
+deactivate SL
+SM -> OBC: dum p log reply PDU \n tag = 10110011, length, [event message tag, event message length, event message]+
+deactivate SM
+
+@enduml

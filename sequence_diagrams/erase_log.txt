@@ -1,0 +1,18 @@
+@startuml
+
+participant OBC
+activate OBC
+OBC -> SM as "Security Manager": erase log PDU \n tag = 00110100, length = 0
+activate SM
+SM -> SL as "Security Log": erase all Security Messages
+activate SL
+SL --> SM: number of entries after erasure
+note right: just 0?
+SL --> SM: remaining space
+note right: how to indicate?
+deactivate SL
+SM -> OBC: erase log reply PDU \n tag = 10110100, length, number of events, remaining space
+deactivate SM
+
+@enduml
+ 

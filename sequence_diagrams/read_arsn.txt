@@ -1,0 +1,21 @@
+@startuml
+
+participant OBC
+OBC -> SM as "Security Manager": read ARSN PDU \n tag = 00010000, length, SPI
+activate SM
+SM -> SAM as "SA Manager": get SA with SPI
+activate SAM
+alt SA found
+   SAM --> SM: SA
+   SM -> SAM: get ARSN of SA
+   SAM --> SM: ARSN
+   deactivate SAM
+   SM -> SL as "Security Log": get ARSN success (SPI, ARSN)
+   SM -> OBC: read ARSN reply PDU \n tag = 10010000, length, SPI, ARSN
+else SA not found
+   SM -> SL: get ARSn fail (SPI not applicable)
+   SM -> OBC: read ARSN reply PDU
+   note right: ?
+end
+deactivate SM
+@enduml

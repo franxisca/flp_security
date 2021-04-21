@@ -1,0 +1,52 @@
+@startuml
+participant VCReception
+activate VCReception
+
+VCReception -> TCProcessSecurity: TCProcessSecurity Payload, GMAP_ID
+activate TCProcessSecurity
+TCProcessSecurity -> SAs: verify SA with SPI
+activate SAs
+TCProcessSecurity -> FSRHandler: Last SPI used: SPI
+activate FSRHandler
+
+alt SA verified and applied on GVC_ID, SA is operational and key is active
+
+   SAs --> TCProcessSecurity: SA
+   TCProcessSecurity -> FSRHandler: Bad SA Flag: 0
+      
+   TCProcessSecurity -> TCProcessSecurity: authenticate and decrypt
+   alt MAC verification success
+      TCProcessSecurity -> FSRHandler: Bad MAC Flag: 0
+      TCProcessSecurity -> FSRHandler: Sequence Number Value (LSB 8): ARC
+      note right: what value when previous tests fail?
+      TCProcessSecurity -> SAs: validate ARC
+      alt ARC validation success
+      TCProcessSecurity -> FSRHandler: Bad Sequence Number Flag: 0
+      TCProcessSecurity -> SAs: set SA ARC to received one
+      deactivate SAs
+      TCProcessSecurity -> VCReception: TCProcessSecurity Return, verification status: 1, verification status code: 0
+      TCProcessSecurity -> TCProcessSecurity: validate padding
+      alt padding success
+      else padding failure
+         TCProcessSecurity -> FSRHandler: set Alarm Field to 1
+         note right: how to prioritize verification status coe?
+         TCProcessSecurity -> VCReception: N/A, verification status: 0, verification status code: 4
+      end
+   else ARC validation failure
+      TCProcessSecurity -> FSRHandler: set Alarm Field to 1
+      TCProcessSecurity -> FSRHandler: Bad Sequence Number Flag: 1
+      TCProcessSecurity -> VCReception: N/A, verification status: 0, verification status code: 3
+   end
+   else MAC verification failure
+      TCProcessSecurity -> FSRHandler: set Alarm Field to 1
+      TCProcessSecurity -> FSRHandler: Bad MAC Flag: 1
+      TCProcessSecurity -> VCReception: N/A, verification status: 0, verification status code: 2
+   end
+else SA failure
+   TCProcessSecurity -> FSRHandler: set Alarm Field to 1
+   TCProcessSecurity -> FSRHandler: Bad SA Flag: 1
+   deactivate FSRHandler
+   TCProcessSecurity -> VCReception: N/A, verification status: 0, verification status code: 1
+end
+deactivate TCProcessSecurity
+@enduml

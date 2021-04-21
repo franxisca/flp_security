@@ -1,0 +1,18 @@
+@startuml
+
+participant OBC
+OBC -> SM as "Security Manager": key verification PDU \n tag= 00000100, length, [keyID, challenge]+
+activate SM
+alt keyID exists
+   SM -> KM as "Key Manager": keyID
+   activate KM
+   KM --> SM: challenge response
+   deactivate KM
+   SM -> SL as "Security Log": verify key success (keyID, challenge response)
+else
+   SM -> SL: verify key fail (keyID, challenge)
+end
+SM -> OBC: key verification reply PDU \n tag = 10000100, length, [keyID, (IV), Encrypted Challenge, Challenge MAC]+
+deactivate SM
+
+@enduml

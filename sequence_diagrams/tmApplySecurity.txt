@@ -1,0 +1,42 @@
+@startuml
+
+participant VCGeneration
+activate VCGeneration
+
+VCGeneration -> TMApplySecurity: TMApplySecurity Payload, GVC_ID
+activate TMApplySecurity
+
+TMApplySecurity -> SAs: get SA configured for VC
+activate SAs
+
+alt SA configured for VC
+
+   SAs --> TMApplySecurity: SA
+
+else no SA configured for VC
+
+   TMApplySecurity -> TMApplySecurity: default SA
+
+end
+
+TMApplySecurity -> TMApplySecurity: generate SDLS security header (SPI || ARC || IV)
+
+TMApplySecurity -> SAs: increment ARC
+
+opt overflow
+   TMApplySecurity -> SAs: expire current SA with SPI A
+   TMApplySecurity -> SAs: activate SA with SPI A XOR (0x00 01) on VC
+end
+note right: use old or new SA for encryption?
+TMApplySecurity -> SAs: increment IV and check overflow
+opt overflow
+   TMApplySecurity -> SAs: expire current SA with SPI A
+   TMApplySecurity -> SAs: activate SA with SPI A XOR (0x00 01) on VC
+end
+deactivate SAs
+
+TMApplySecurity -> TMApplySecurity: encrypt and authenticate
+
+TMApplySecurity -> VCGeneration: ApplySecurity Return
+deactivate TMApplySecurity
+@enduml

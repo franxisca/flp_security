@@ -1,0 +1,30 @@
+@startuml
+
+participant OBC
+OBC -> SM as "Security Manager": rekey SA PDU \n tag = 00010110, length, SPI, keyID, ARC, IV
+activate SM
+SM -> SAM as "SA Manager": get SA with SPI
+activate SAM
+alt SA found
+   SAM --> SM: SA
+   alt SA state = UNKEYED
+      alt keyID found
+         alt key state = ACTIVE
+            SM -> SAM: import key(s), ARC, IV(s) into SA
+            SM -> SAM: state = KEYED for SA
+            deactivate SAM
+         else key not ACTIVE
+            SM -> SL as "Security Log": rekey SA fail (keyID not ACTIVE)
+         end
+      else key not found
+         SM -> SL: rekey SA fail (keyID not found)
+      end
+   else SA not UNKEYED
+      SM -> SL: rekey SA fail (SPI not UNKEYED)
+   end
+else SA not found
+   SM -> SL: rekey SA fail (SPI not found)
+   deactivate SM
+end
+
+@enduml

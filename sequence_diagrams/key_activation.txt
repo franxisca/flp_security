@@ -1,0 +1,18 @@
+@startuml
+
+participant OBC
+OBC -> SM as "Security Manager": activate key PDU \n tag = 00000010, length, keyID(s)
+activate SM
+alt keyID exists
+   alt key state = PREACTIVE
+      SM -> KM as "Key Manager": state = ACTIVE for keyID
+      SM -> SL as "Security Log": activate key success (keyID)
+   else key not PREACTIVE
+      SM -> SL: activate key fail (keyID not PREACTIVE)
+   end
+else keyId does not exist
+   SM -> SL: activate key fail (keyID not applicable)
+end
+deactivate SM
+
+@enduml

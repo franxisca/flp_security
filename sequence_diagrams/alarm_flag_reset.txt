@@ -1,0 +1,11 @@
+@startuml
+
+participant OBC
+activate OBC
+OBC -> SecurityManager: alarm flag reset PDU \n tag = 00110111, length = 0
+activate SecurityManager
+SecurityManager -> FSRHandler: reset alarm flags
+SecurityManager -> SecurityLog: reset alarm flag success
+deactivate SecurityManager
+
+@enduml

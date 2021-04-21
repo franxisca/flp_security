@@ -1,0 +1,18 @@
+@startuml
+
+participant OBC
+OBC -> SM as "Security Manager": set ARSN PDU \n tab = 00011010, length, SPI, new ARC
+activate SM 
+SM -> SAM as "SA Manager": get SA with SPI
+activate SAM
+alt SA found
+   SAM --> SM: SA
+   SM -> SAM: set SA ARC to new ARC
+   deactivate SAM
+   SM -> SL as "Security Log": set ARSN success (SPI, new ARC)
+else SA not found
+   SM -> SL: set ARSN fail (SPI not applicable)
+end
+deactivate SM
+
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+
+participant OBC
+OBC -> SM as "Security Manager": expire SA PDU \n tag = 00011001, length, SPI
+activate SM
+SM -> SAM as "SA Manager": get SA with SPI
+activate SAM
+alt SA found
+   SAM --> SM: SA
+   alt SA state = KEYED
+      SM -> SAM: remove all keys from SA
+      SM -> SAM: SA state = UNKEYED
+      deactivate SAM
+      SM -> SL as "Security Log": expire SA success (SPI)
+   else SA not KEYED
+      SM -> SL: expire SA fail (SPI not KEYED)
+   end
+else SA not found
+   SM -> SL: expire SA fail (SPI not applicable)
+end
+deactivate SM
+
+@enduml
