@@ -1,0 +1,17 @@
+@startuml
+
+package flp.security.log {
+
+class LogEntry {
++ byte tag
++ byte length
++ byte[length] message
+}
+
+class Logger {
++ insertEntry (LogEntry entry)
++ dumpLog()
++ eraseLog()
+}
+}
+@enduml

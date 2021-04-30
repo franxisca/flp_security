@@ -1,0 +1,59 @@
+@startuml
+
+package flp.security.frame {
+class TMFrame {
++ byte[6] primaryHeader
++ byte[] secondaryHeader
++ byte[] frameData
++ byte[4] OCF
++ byte[2] FECF
+__
++ TMFrame (byte[6] primaryHeader, byte[] secondaryHeader, byte[] frameData, byte[4] OCF, byte[2] FECF)
++ encrypt()
++ authenticate()
+}
+class FrameProcessor {
++ ApplySecurity enc
++ ProcessSecurity dec
+}
+class TCFrame {
++ byte[6] primaryHeader
++ byte[] data
++ byte[2] sPI
++ byte[4] aRC
++ byte[12] iV
++ byte[16] mAC
+__
++ TCFrame (byte[6] primaryHeader, byte[] data, byte[2] sPI, byte[4] aRC, byte[12] iV, byte[16] mAC)
++ decrypt()
++ authenticate()
+}
+
+class FSR {
++ bit controlWordType
++ bit[3] fSRVersionNumber
++ bit badSN
++ bit badMAC
++ bit badSA
++ byte[2] lastSPI
++ byte sNValue
+__
++ FSR(bit controlWordType, bit[3] fSRVersionNumber, bit badSN, bit badMAC, bit badSA, byte[2] lastSPI, byte sNValue)
+}
+
+class ApplySecurity {
++ apply(TMFrame)
+}
+
+class ProcessSecurity {
++ process (TCFrame)
+- verificationStatus()
+- createFSR()
+}
+
+FrameProcessor "1" *-- "1..*" ApplySecurity
+FrameProcessor "1" *-- "1..*" ProcessSecurity
+}
+@enduml
+
+

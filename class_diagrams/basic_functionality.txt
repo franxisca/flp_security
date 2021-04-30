@@ -1,0 +1,37 @@
+@startuml
+
+package flp.security {
+
+class Storage {
++ HashMap <byte, SecurityModule> modules
++ HashMap <short, MasterKey> masterKeys
++ HashMap <short, SessionKey> sessionKeys
++ HashMap <byte[2], SA> sAs
++ List<byte[]> log
+__
+init()
+}
+
+class Main {
++ static void main (String[] args)
+}
+
+class Listener {
++ byte[] listen()
+}
+
+class Processor {
++ forward (byte[])
+}
+
+class SecurityModule {
++ FrameProcessor frP
++ SecurityManager secM
++ byte iD
++ HashMap<byte[2], SA> SAs
+-configureSAs()
+}
+
+SecurityModule "1" *-- "1..*" Storage
+}
+@enduml

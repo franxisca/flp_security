@@ -1,0 +1,49 @@
+@startuml
+package flp.security.key {
+enum MasterKeyState {
+	POWERED_OFF,
+	ACTIVE,
+	PRE_ACTIVE,
+	DEACTIVATED
+}
+
+enum SessionKeyState {
+	POWERED_OFF,
+	ACTIVE,
+	PRE_ACTIVE,
+	DEACTIVATED,
+	ERASED
+}
+
+abstract class	Key {
+	+ short keyID
+	- T key
+	+ boolean startUp
+} 
+class MasterKey {
+	+ MasterKeyState state
+	__
+	MasterKey(short keyID)
+}
+class SessionKey {
+	+ SessionKeyState state
+	__
+	SessionKey(short keyID)
+}
+
+class KeyManager {
+	__
+	+ keyInventory()
+	+ activateKey(short keyID)
+	+ deactivateKey(short keyID)
+	+ verifyKey(short keyID, T challenge)
+	+ otar (short keyID, T key)
+	+ replaceKey(short keyID)
+	+ eraseKey(short keyID)
+}
+Key <|-- SessionKey
+Key <|-- MasterKey
+MasterKey "1" *-- "1..*" MasterKeyState
+SessionKey "1" *-- "1..*" SessionKeyState 
+}
+@enduml

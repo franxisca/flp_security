@@ -1,0 +1,48 @@
+@startuml
+
+package flp.security.sa {
+
+class SA {
++ byte[2] sPI
++ byte[12] iVValue
++ byte[4] aRCValue
++ short authBitMaskLength
++ byte[authBitMaskLength] authBitMask
++ long aRCWindow
++ short keyId
++ SAstate state
++ long channelId
+}
+
+class StandardSA{
+__
+StandardSA(byte[2] sPI)
+}
+
+class CriticalSA{
+__
+CriticalSA(byte[2] sPI)
+}
+
+enum SAState {
+POWERED_OFF,
+OPERATIONAL,
+KEYED,
+UNKEYED
+}
+class SAManager {
++ statusRequest( byte[2] sPI)
++ expire (byte[2] sPI)
++ rekey (byte[2] sPI, short keyID)
++ setARSN (byte[2] sPI, short aRC)
++ readARSN (byte[2] sPI)
++ setARSNWindow (byte[2] sPI, short window)
++ start (byte[2] sPI)
++ stop (byte[2] sPI)
+}
+
+SA <|-- StandardSA
+SA <|-- CriticalSA
+SA "1" *-- "1..*" SAState
+}
+@enduml

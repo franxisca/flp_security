@@ -1,0 +1,8 @@
+@startuml
+package flp.security.external{
+interface OBC
+interface VC_OCF
+interface TCDecoder
+interface TMEncoder
+}
+@enduml

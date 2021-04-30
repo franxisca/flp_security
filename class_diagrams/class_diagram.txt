@@ -1,0 +1,287 @@
+@startuml
+
+package flp.security {
+
+class Storage {
++ HashMap <byte, SecurityModule> modules
++ HashMap <short, MasterKey> masterKeys
++ HashMap <short, SessionKey> sessionKeys
++ HashMap <byte[2], SA> sAs
++ List<byte[]> log
+__
+init()
+}
+
+class Main {
++ static void main (String[] args)
+}
+
+class Listener {
++ byte[] listen()
+}
+
+class Processor {
++ forward (byte[])
+}
+
+class SecurityModule {
++ FrameProcessor frP
++ SecurityManager secM
++ byte iD
++ HashMap<byte[2], SA> SAs
+-configureSAs()
+}
+
+SecurityModule "1" *-- "1..*" Storage
+}
+
+package flp.security.frame {
+class TMFrame {
++ byte[6] primaryHeader
++ byte[] secondaryHeader
++ byte[] frameData
++ byte[4] OCF
++ byte[2] FECF
+__
++ TMFrame (byte[6] primaryHeader, byte[] secondaryHeader, byte[] frameData, byte[4] OCF, byte[2] FECF)
++ encrypt()
++ authenticate()
+}
+class FrameProcessor {
++ ApplySecurity enc
++ ProcessSecurity dec
+}
+class TCFrame {
++ byte[6] primaryHeader
++ byte[] data
++ byte[2] sPI
++ byte[4] aRC
++ byte[12] iV
++ byte[16] mAC
+__
++ TCFrame (byte[6] primaryHeader, byte[] data, byte[2] sPI, byte[4] aRC, byte[12] iV, byte[16] mAC)
++ decrypt()
++ authenticate()
+}
+
+class FSR {
++ bit controlWordType
++ bit[3] fSRVersionNumber
++ bit badSN
++ bit badMAC
++ bit badSA
++ byte[2] lastSPI
++ byte sNValue
+__
++ FSR(bit controlWordType, bit[3] fSRVersionNumber, bit badSN, bit badMAC, bit badSA, byte[2] lastSPI, byte sNValue)
+}
+
+class ApplySecurity {
++ apply(TMFrame)
+}
+
+class ProcessSecurity {
++ process (TCFrame)
+- verificationStatus()
+- createFSR()
+}
+
+FrameProcessor "1" *-- "1..*" ApplySecurity
+FrameProcessor "1" *-- "1..*" ProcessSecurity
+}
+
+package flp.security.external{
+interface OBC
+interface VC_OCF
+interface TCDecoder
+interface TMEncoder
+}
+
+package flp.security.management {
+
+abstract class PDU {
+int length
+byte[length] value
+}
+
+class ReplyPDU {
+ReplyPDUTag tag
+__
+ReplyPDU(ReplyPDUTag tag)
+}
+
+class CommandPDU {
+CommandPDUTag tag
+__
+CommandPDU(CommandPDUTag tag)
+}
+
+enum ReplyPDUTag {
+
+10000100 (key verification),
+10000111 (key inventory),
+10011111 (SA status request),
+10010000 (read ARSN),
+10110001 (ping),
+10110011 (dump log),
+10110100 (erase log)
+}
+
+enum CommandPDUTag {
+00000001 (otar),
+00000010 (key activation),
+00000011 (key deactivation),
+00000100 (key verification),
+00000111 (key inventory),
+00011011 (start SA),
+00011110 (stop SA),
+00010110 (rekey SA),
+00011001 (expire SA),
+00011010 (set ARSN),
+00010101 (set ARSN window),
+00011111 (SA status request),
+00010000 (read ARSN),
+00110001 (ping),
+00110011 (dump log),
+00110100 (erase log),
+00110111 (alarm flag reset)
+}
+
+class SecurityManager {
++ KeyManager km
++ SAManager sam
++ Logger sLog
+__
++ handle (PDU command)
+- otar(byte[] value)
+- keyActivation(byte[] value)
+- keyDeactivation(byte[] value)
+- keyVerification(byte[] value)
+- keyInventory(byte[] value)
+- startSA(byte[] value)
+- stopSA(byte[] value)
+- rekeySA(byte[] value)
+- expireSA(byte[] value)
+- setARSN(byte[] value)
+- setARSNWindow(byte[] value)
+- sAStausRequest(byte[] value)
+- readARSN(byte[] value)
+- ping()
+- dumpLog()
+- eraseLog()
+- alarmFlagReset()
+}
+
+PDU <|-- ReplyPDU
+PDU <|-- CommandPDU
+ReplyPDU "1" *-- "1..*" ReplyPDUTag
+CommandPDU "1" *-- "1..*" CommandPDUTag
+}
+
+
+package flp.security.log {
+
+class LogEntry {
++ byte tag
++ byte length
++ byte[length] message
+}
+
+class Logger {
++ insertEntry (LogEntry entry)
++ dumpLog()
++ eraseLog()
+}
+}
+
+package flp.security.sa {
+
+class SA {
++ byte[2] sPI
++ byte[12] iVValue
++ byte[4] aRCValue
++ short authBitMaskLength
++ byte[authBitMaskLength] authBitMask
++ long aRCWindow
++ short keyId
++ SAstate state
++ long channelId
+}
+
+class StandardSA{
+__
+StandardSA(byte[2] sPI)
+}
+
+class CriticalSA{
+__
+CriticalSA(byte[2] sPI)
+}
+
+enum SAState {
+POWERED_OFF,
+OPERATIONAL,
+KEYED,
+UNKEYED
+}
+
+SA <|-- StandardSA
+SA <|-- CriticalSA
+SA "1" *-- "1..*" SAState
+}
+
+package flp.security.key {
+enum MasterKeyState {
+	POWERED_OFF,
+	ACTIVE,
+	PRE_ACTIVE,
+	DEACTIVATED
+}
+
+enum SessionKeyState {
+	POWERED_OFF,
+	ACTIVE,
+	PRE_ACTIVE,
+	DEACTIVATED,
+	ERASED
+}
+
+abstract class	Key {
+	+ short keyID
+	- T key
+	+ boolean startUp
+} 
+class MasterKey {
+	+ MasterKeyState state
+	__
+	MasterKey(short keyID)
+}
+class SessionKey {
+	+ SessionKeyState state
+	__
+	SessionKey(short keyID)
+}
+
+class KeyManager {
+	__
+	+ keyInventory()
+	+ activateKey(short keyID)
+	+ deactivateKey(short keyID)
+	+ verifyKey(short keyID, T challenge)
+	+ otar (short keyID, T key)
+	+ replaceKey(short keyID)
+	+ eraseKey(short keyID)
+}
+Key <|-- SessionKey
+Key <|-- MasterKey
+MasterKey "1" *-- "1..*" MasterKeyState
+SessionKey "1" *-- "1..*" SessionKeyState 
+}
+flp.security.management -- flp.security.key
+flp.security.management -- flp.security.sa
+flp.security.management -- flp.security.log
+flp.security -- flp.security.frame
+flp.security -- flp.security.sa
+flp.security -- flp.security.external
+flp.security -- flp.security.key
+@enduml
