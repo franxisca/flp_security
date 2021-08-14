@@ -8,6 +8,7 @@ import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 
 public class SA extends AbstractBehavior<SA.Command> {
 
@@ -17,6 +18,16 @@ public class SA extends AbstractBehavior<SA.Command> {
         final ActorRef<Log.Command> log;
 
         public Stop(ActorRef<Log.Command> log) {
+            this.log = log;
+        }
+    }
+
+    public static final class Start implements Command {
+        final int channel;
+        final ActorRef<Log.Command> log;
+
+        public Start(int channel, ActorRef<Log.Command> log) {
+            this.channel = channel;
             this.log = log;
         }
     }
@@ -103,10 +114,11 @@ public class SA extends AbstractBehavior<SA.Command> {
     private SAState state;
     private SAState prevState;
     //maybe there are multiple channels
-    private long channelId;
+    private ArrayList<Integer> channels;
+    //private long channelId;
     private final boolean critical;
 
-    private SA (ActorContext<Command> context, short sPi, byte[] iV, byte[] aRC, int authMaskLength, byte[] authBitMask, long aRCWindow, byte keyId, SAState state, long channelId, boolean critical) {
+    private SA (ActorContext<Command> context, short sPi, byte[] iV, byte[] aRC, int authMaskLength, byte[] authBitMask, long aRCWindow, byte keyId, SAState state, ArrayList<Integer> channels, boolean critical) {
         super(context);
         //this.sPi = new byte[sPi.length];
         this.sPi = sPi;
@@ -117,7 +129,7 @@ public class SA extends AbstractBehavior<SA.Command> {
         this.aRCWindow = aRCWindow;
         this.keyId = keyId;
         this.state = state;
-        this.channelId = channelId;
+        this.channels = channels;
         this.critical = critical;
     }
     private SA (ActorContext<Command> context, short sPi, int authMaskLength, byte[] authBitMask, boolean critical) {
@@ -132,6 +144,7 @@ public class SA extends AbstractBehavior<SA.Command> {
     public Receive<Command> createReceive() {
         return newReceiveBuilder()
                 .onMessage(Stop.class, this::onStop)
+                .onMessage(Start.class, this::onStart)
                 .onMessage(Rekey.class, this::onRekey)
                 .onMessage(Expire.class, this::onExpire)
                 .onMessage(SetARSN.class, this::onSetARSN)
@@ -152,7 +165,7 @@ public class SA extends AbstractBehavior<SA.Command> {
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
-            this.channelId = -1;
+            this.channels.clear();
             this.state = SAState.KEYED;
             this.prevState = SAState.OPERATIONAL;
             byte tag = (byte) 0b10011110;
@@ -273,8 +286,9 @@ public class SA extends AbstractBehavior<SA.Command> {
             value[0] = (byte) (this.sPi & 0xff);
             value[1] = (byte) ((this.sPi >> 8) & 0xff);
             value[2] = this.state.toByte();
-            trans = new SAState[1];
-            trans[0] = this.state;
+            trans = new SAState[2];
+            trans[0] = this.prevState;
+            trans[1] = this.state;
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         s.replyTo.tell(new PDUManager.SAStatusRequestReply(this.sPi, trans, s.secMan));
@@ -291,6 +305,33 @@ public class SA extends AbstractBehavior<SA.Command> {
         System.arraycopy(this.aRC, 0, value, 2, 4);
         r.log.tell(new Log.InsertEntry(tag, length, value));
         r.replyTo.tell(new PDUManager.ReadARSNReply(this.sPi, this.aRC, r.secMan));
+        return this;
+    }
+
+    //TODO: multiple states per SA? for differrent channels?
+    private Behavior<Command> onStart(Start s) {
+        if(this.state != SAState.KEYED) {
+            byte tag = (byte) 0b00101011;
+            short length = 6;
+            byte[] value = new byte[6];
+            value[0] = (byte) (this.sPi & 0xff);
+            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            byte[] bytes = ByteBuffer.allocate(4).putInt(s.channel).array();
+            System.arraycopy(bytes, 0, value, 2, 4);
+            s.log.tell(new Log.InsertEntry(tag, length, value));
+        }
+        else {
+            this.state = SAState.OPERATIONAL;
+            this.channels.add(s.channel);
+            byte tag = (byte) 0b10011011;
+            short length = 6;
+            byte[] value = new byte[6];
+            value[0] = (byte) (this.sPi & 0xff);
+            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            byte[] bytes = ByteBuffer.allocate(4).putInt(s.channel).array();
+            System.arraycopy(bytes, 0, value, 2, 4);
+            s.log.tell(new Log.InsertEntry(tag, length, value));
+        }
         return this;
     }
 }

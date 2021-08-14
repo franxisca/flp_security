@@ -142,15 +142,13 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
                 break;
             }
             //dump log
-            //TODO
             case (byte) 0b00110011: {
-                this.pduMan.tell(new PDUManager.DumpLog());
+                this.pduMan.tell(new PDUManager.DumpLog(getContext().getSelf(), this.log));
                 break;
             }
             //erase log
-            //TODO
             case (byte) 0b00110100: {
-                this.pduMan.tell(new PDUManager.EraseLog());
+                this.pduMan.tell(new PDUManager.EraseLog(getContext().getSelf(), this.log));
                 break;
             }
             //alarm flag reset

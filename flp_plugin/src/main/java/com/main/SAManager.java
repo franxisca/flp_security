@@ -103,6 +103,15 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
     }
 
     public static final class Start implements Command {
+        final short sPi;
+        final int channel;
+        final ActorRef<Log.Command> log;
+
+        public Start(short sPi, int channel, ActorRef<Log.Command> log) {
+            this.sPi = sPi;
+            this.channel = channel;
+            this.log = log;
+        }
 
     }
 
@@ -131,6 +140,7 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
     public Receive<Command> createReceive() {
         return newReceiveBuilder()
                 .onMessage(Stop.class, this::onStop)
+                .onMessage(Start.class, this::onStart)
                 .onMessage(Rekey.class, this::onRekey)
                 .onMessage(Expire.class, this::onExpire)
                 .onMessage(SetARSN.class, this::onSetARSN)
@@ -247,7 +257,7 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
     }
 
     private Behavior<Command> onReadARSN(ReadARSN r) {
-        ActorRef<SA.Command> saActor = sPiToActor.get(r.sPi);
+        ActorRef<SA.Command> saActor = this.sPiToActor.get(r.sPi);
         //no SA with this spi
         if(saActor == null) {
             byte tag = (byte) 0b00010000;
@@ -259,6 +269,25 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         }
         else {
             saActor.tell(new SA.ReadARSN(r.log, r.pum, r.replyTo));
+        }
+        return this;
+    }
+
+    private Behavior<Command> onStart(Start s) {
+        ActorRef<SA.Command> saActor = this.sPiToActor.get(s.sPi);
+        //no SA with this spi
+        if(saActor == null) {
+            byte tag = (byte) 0b00011011;
+            short length = 5;
+            byte[] value = new byte[5];
+            value[0] = (byte) (s.sPi & 0xff);
+            value[1] = (byte) ((s.sPi >> 8) & 0xff);
+            byte[] bytes = ByteBuffer.allocate(4).putInt(s.channel).array();
+            System.arraycopy(bytes, 0, value, 2, 4);
+            s.log.tell(new Log.InsertEntry(tag, length, value));
+        }
+        else {
+            saActor.tell(new SA.Start(s.channel, s.log));
         }
         return this;
     }

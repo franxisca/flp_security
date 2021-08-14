@@ -17,7 +17,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     public interface Command {}
 
     //SecurityManager needs to pass reference to KeyManager when issuing otar to PDUManager
-    //TODO: store keys encrypted, fix key length
+    //TODO: store keys encrypted, fix key length (length 256 bits according to cipher)
     public static final class Otar implements Command{
         //final byte[] length;
         final byte[] value;
@@ -57,7 +57,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         }
     }
 
-    //TODO
+    //TODO, ask in meeting
     //wtf do i get here exactly, needs to be replied to
     public static final class KeyVerification implements Command{
         final byte[] value;
@@ -88,16 +88,19 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //TODO
+    //TODO: check if multiple states per SA for different channels
+    //TODO: how is channel "applicable" for SA?
     //value contains only one SPI but might contain multiple GVC/GMAP ids to add to SA, how is a channel not applicable to SA?
+    //ignoring that maybe not applicable
+    //channel ids have 32 bit (size of int)
     public static final class StartSA implements Command{
         final byte[] value;
-        final ActorRef<SAManager.Command> replyTo;
+        final ActorRef<SAManager.Command> sam;
         final ActorRef<Log.Command> log;
 
-        public StartSA (byte[] value, ActorRef<SAManager.Command> replyTo, ActorRef<Log.Command> log) {
+        public StartSA (byte[] value, ActorRef<SAManager.Command> sam, ActorRef<Log.Command> log) {
             this.value = value;
-            this.replyTo = replyTo;
+            this.sam = sam;
             this.log = log;
         }
 
@@ -176,7 +179,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //should work, TODO: reply
+    //should work
     public static final class SAStatusRequest implements Command {
         final byte[] value;
         final ActorRef<SAManager.Command> sam;
@@ -253,12 +256,12 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //TODO
+    //TODO, ask in meeting because no idea what key verification does
     public static final class KeyVerificationReply implements Command {
 
     }
 
-    //TODO: in onReply method (encode keyState)
+    //should work
     public static final class KeyInventoryReply implements Command {
         final short number;
         final Map<Byte, KeyState> keyIdToState;
@@ -272,7 +275,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //TODO
+    //should work
     public static final class SAStatusRequestReply implements Command {
         final SAState[] trans;
         final short sPi;
@@ -285,7 +288,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         }
 
     }
-    //TODO: check if it works
+    //should work
     public static final class ReadARSNReply implements Command {
         final short sPi;
         final byte[] arc;
@@ -391,9 +394,19 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     private Behavior<Command> onStartSA(StartSA s) {
-        byte[] sPi = new byte[2];
-        sPi[0] = s.value[0];
-        sPi[1] = s.value[1];
+        ByteBuffer bb2 = ByteBuffer.allocate(2);
+        bb2.put(s.value[0]);
+        bb2.put(s.value[1]);
+        short sPi = bb2.getShort(0);
+        for(int i = 2; i < s.value.length; i = i + 4) {
+            ByteBuffer bb = ByteBuffer.allocate(4);
+            bb.put(s.value[i]);
+            bb.put(s.value[i+1]);
+            bb.put(s.value[i+2]);
+            bb.put(s.value[i+3]);
+            int channel = bb.getInt(0);
+            s.sam.tell(new SAManager.Start(sPi, channel, s.log));
+        }
 
         return this;
     }
@@ -479,8 +492,13 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     private Behavior<Command> onStatusReply(SAStatusRequestReply s) {
-        //TODO: how to encode SA state transition?
-        //TODO reply to SecurityManagaer (s.replyTo)
+        //reply PDU has tag 10011111, length, spi, one byte state transition
+        byte tag = (byte) 0b10011111;
+        short length = 3;
+        byte[] value = new byte[3];
+        value[0] = (byte) (s.sPi & 0xff);
+        value[1] = (byte) ((s.sPi >> 8) & 0xff);
+        s.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
         return this;
     }
 
@@ -494,7 +512,6 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     private Behavior<Command> onReadARSNReply(ReadARSNReply r) {
-        //TODO find correct tag and how to encode it
         byte tag = (byte) 0b10010000;
         short length = 6;
         //2 byte spi, 4 byte arc
@@ -532,8 +549,8 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         {
             Map.Entry<Byte, KeyState> pair = (Map.Entry) it.next();
             value[i] = pair.getKey();
-            //TODO: encode right keyState as byte
-            value[i+1] = 0x00;
+            //encode keyState as byte
+            value[i+1] = pair.getValue().toByte();
         }
         k.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
         return this;
