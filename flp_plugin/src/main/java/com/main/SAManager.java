@@ -9,6 +9,7 @@ import akka.actor.typed.javadsl.Receive;
 import akka.japi.Pair;
 
 import java.lang.reflect.Array;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -143,7 +144,12 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         ActorRef<SA.Command> saActor = sPiToActor.get(s.sPi);
         //no SA with this spi
         if (saActor == null) {
-            s.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00011110;
+            short length = 2;
+            byte[] value = new byte[2];
+            value[0] = (byte) (s.sPi & 0xff);
+            value[1] = (byte) ((s.sPi >> 8) & 0xff);
+            s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             saActor.tell(new SA.Stop(s.log));
@@ -155,7 +161,13 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         ActorRef<SA.Command> saActor = sPiToActor.get(r.sPi);
         //no SA with this spi
         if(saActor == null) {
-            r.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00110110;
+            short length = 3;
+            byte[] value = new byte[3];
+            value[0] = (byte) (r.sPi & 0xff);
+            value[1] = (byte) ((r.sPi >> 8) & 0xff);
+            value[2] = r.keyId;
+            r.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             saActor.tell(new SA.Rekey(r.keyId, r.arc, r.iv, r.log));
@@ -167,7 +179,12 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         ActorRef<SA.Command> saActor = sPiToActor.get(e.sPi);
         //no SA with this sPi
         if(saActor == null ) {
-            e.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00011001;
+            short length = 2;
+            byte[] value = new byte[2];
+            value[0] = (byte) (e.sPi & 0xff);
+            value[1] = (byte) ((e.sPi >> 8) & 0xff);
+            e.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             saActor.tell(new SA.Expire(e.log));
@@ -179,7 +196,13 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         ActorRef<SA.Command> saActor = sPiToActor.get(s.sPi);
         //no SA with this spi
         if(saActor == null) {
-            s.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00011010;
+            short length = 6;
+            byte[] value = new byte[6];
+            value[0] = (byte) (s.sPi & 0xff);
+            value[1] = (byte) ((s.sPi >> 8) & 0xff);
+            System.arraycopy(s.arc, 0, value, 2, 4);
+            s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             saActor.tell(new SA.SetARSN(s.arc, s.log));
@@ -191,7 +214,14 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         ActorRef<SA.Command> saActor = sPiToActor.get(s.sPi);
         //no SA with this spi
         if(saActor == null) {
-            s.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00010101;
+            short length = 10;
+            byte[] value = new byte[10];
+            value[0] = (byte) (s.sPi & 0xff);
+            value[1] = (byte) ((s.sPi >> 8) & 0xff);
+            byte[] bytes = ByteBuffer.allocate(8).putLong(s.arcWindow).array();
+            System.arraycopy(bytes, 0, value, 2, 8);
+            s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             saActor.tell(new SA.SetARSNWindow(s.arcWindow, s.log));
@@ -203,7 +233,12 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         ActorRef<SA.Command> saActor = sPiToActor.get(s.sPi);
         //no SA with this spi
         if(saActor == null) {
-            s.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00011111;
+            short length = 2;
+            byte[] value = new byte[2];
+            value[0] = (byte) (s.sPi & 0xff);
+            value[1] = (byte) ((s.sPi >> 8) & 0xff);
+            s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             saActor.tell(new SA.StatusRequest(s.log, s.pum, s.replyTo));
@@ -215,7 +250,12 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         ActorRef<SA.Command> saActor = sPiToActor.get(r.sPi);
         //no SA with this spi
         if(saActor == null) {
-            r.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00010000;
+            short length = 2;
+            byte[] value = new byte[2];
+            value[0] = (byte) (r.sPi & 0xff);
+            value[1] = (byte) ((r.sPi >> 8) & 0xff);
+            r.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             saActor.tell(new SA.ReadARSN(r.log, r.pum, r.replyTo));

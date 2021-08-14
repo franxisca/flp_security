@@ -5,5 +5,10 @@ public enum SAState {
     OPERATIONAL,
     KEYED,
     UNKEYED,
-    NAN
+    NAN;
+
+    public byte toByte() {
+        //TODO: encode SAStates
+        return (byte) 0b00000000;
+    }
 }

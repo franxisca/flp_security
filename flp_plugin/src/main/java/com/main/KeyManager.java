@@ -5,6 +5,7 @@ import akka.actor.typed.Behavior;
 import akka.actor.typed.javadsl.*;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 public class KeyManager extends AbstractBehavior<KeyManager.Command> {
@@ -136,13 +137,21 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         ActorRef<Key.Command> keyActor = keyIdToActor.get(o.keyId);
         //key with keyId to insert already exists, log accordingly
         if (keyActor != null) {
-            o.replyTo.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00000001;
+            short length = 1;
+            byte[] value = new byte[1];
+            value[0] = o.keyId;
+            o.replyTo.tell(new Log.InsertEntry(tag, length, value));
         }
         //create new key, log it
         else {
             keyActor = getContext().spawn(Key.create(o.keyId, o.key, false), "key" + o.keyId);
             keyIdToActor.put(o.keyId, keyActor);
-            o.replyTo.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b10000001;
+            short length = 1;
+            byte[] value = new byte[1];
+            value[0] =  o.keyId;
+            o.replyTo.tell(new Log.InsertEntry(tag, length, value));
         }
         return this;
     }
@@ -151,7 +160,11 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         ActorRef<Key.Command> keyActor = keyIdToActor.get(a.keyId);
         //key to activate does not exist
         if (keyActor == null) {
-            a.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00000010;
+            short length = 1;
+            byte[] value = new byte[1];
+            value[0] = a.keyId;
+            a.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             keyActor.tell(new Key.Activate(a.log));
@@ -163,7 +176,11 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         ActorRef<Key.Command> keyActor = keyIdToActor.get(k.keyId);
         //key to deactivate does not exist
         if(keyActor == null) {
-            k.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00000010;
+            short length = 1;
+            byte[] value = new byte[1];
+            value[0] = k.keyId;
+            k.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             keyActor.tell(new Key.Deactivate(k.log));
@@ -175,7 +192,13 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         ActorRef<Key.Command> keyActor = keyIdToActor.get(r.keyId);
         //key to rekey with does not exist
         if(keyActor == null) {
-            r.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00010110;
+            short length = 2;
+            byte[] value = new byte[3];
+            value[0] = (byte)(r.sPi & 0xff);
+            value[1] = (byte) ((r.sPi >> 8) & 0xff);
+            value[2] = r.keyId;
+            r.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             keyActor.tell(new Key.CheckRekey(r.sPi, r.arc, r.iv, r.log, r.sam));
@@ -192,7 +215,21 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             keyActor = keyIdToActor.get(k.currKey);
         }
         if(keyActor == null){
-            k.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00000111;
+            short length = (short) ((k.number * 2) + 2);
+            byte[] value = new byte[length];
+            value[0] = (byte) (k.number & 0xff);
+            value[1] = (byte) ((k.number >> 8) &0xff);
+            Iterator it = k.keyIdToState.entrySet().iterator();
+            int i = 2;
+            while (it.hasNext()) {
+                Map.Entry<Byte, KeyState> pair = (Map.Entry) it.next();
+                value[i] = pair.getKey();
+                i++;
+                value[i] = pair.getValue().toByte();
+                i++;
+            }
+            k.log.tell(new Log.InsertEntry(tag, length, value));
             k.pum.tell(new PDUManager.KeyInventoryReply(k.number, k.keyIdToState, k.secMan));
         }
         //found a key to check

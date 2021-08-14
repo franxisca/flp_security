@@ -7,6 +7,8 @@ import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 
+import java.nio.ByteBuffer;
+
 public class SA extends AbstractBehavior<SA.Command> {
 
     public interface Command {}
@@ -142,13 +144,23 @@ public class SA extends AbstractBehavior<SA.Command> {
     private Behavior<Command> onStop(Stop s) {
         //SA not in state to be stopped
         if(this.state != SAState.OPERATIONAL) {
-            s.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00101110;
+            short length = 2;
+            byte[] value = new byte[2];
+            value[0] = (byte) (this.sPi & 0xff);
+            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             this.channelId = -1;
             this.state = SAState.KEYED;
             this.prevState = SAState.OPERATIONAL;
-            s.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b10011110;
+            short length = 2;
+            byte[] value = new byte[2];
+            value[0] = (byte) (this.sPi & 0xff);
+            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         return this;
     }
@@ -157,9 +169,15 @@ public class SA extends AbstractBehavior<SA.Command> {
 
         //already checked if key exists and is in right state
 
+        short length = 3;
+        byte[] value = new byte[3];
+        value[0] = (byte) (this.sPi & 0xff);
+        value[1] = (byte) ((this.sPi >> 8) & 0xff);
+        value[2] = r.keyId;
         //if SA in wrong state to be rekeyed log that
         if(this.state != SAState.UNKEYED) {
-            r.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00000110;
+            r.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             this.keyId = r.keyId;
@@ -168,54 +186,96 @@ public class SA extends AbstractBehavior<SA.Command> {
             this.aRC = r.arc;
             this.iV = r.iv;
             //log success
-            r.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b10010110;
+            r.log.tell(new Log.InsertEntry(tag, length, value));
         }
 
         return this;
     }
 
     private Behavior<Command> onExpire(Expire e) {
+        short length = 2;
+        byte[] value = new byte[2];
+        value[0] = (byte) (this.sPi & 0xff);
+        value[1] = (byte) ((this.sPi >> 8) & 0xff);
         //SA not in the right state
         if(this.state != SAState.KEYED) {
-            e.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00101001;
+            e.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
+            byte tag = (byte) 0b10011001;
             this.keyId = -1;
             this.state = SAState.UNKEYED;
             this.prevState = SAState.KEYED;
-            e.log.tell(new Log.InsertEntry());
+            e.log.tell(new Log.InsertEntry(tag, length, value));
         }
         return this;
     }
 
     private Behavior<Command> onSetARSN(SetARSN s) {
+        short length = 6;
+        byte[] value = new byte[6];
+        value[0] = (byte) (this.sPi & 0xff);
+        value[1] = (byte) ((this.sPi >> 8) & 0xff);
+        System.arraycopy(s.arc, 0, value, 2, 4);
         //maybe check if that is a valid value according to ARSNWindow?
-        /*if (s.arc > this.aRCWindow) {
-
-        }*/
-        this.aRC = s.arc;
-        s.log.tell(new Log.InsertEntry());
+        ByteBuffer bb = ByteBuffer.allocate(4);
+        bb.put(s.arc[0]);
+        bb.put(s.arc[1]);
+        bb.put(s.arc[2]);
+        bb.put(s.arc[3]);
+        int arc = bb.getInt(0);
+        if((long) arc > this.aRCWindow) {
+            byte tag = (byte) 0b00101010;
+            s.log.tell(new Log.InsertEntry(tag, length, value));
+        }
+        else {
+            this.aRC = s.arc;
+            byte tag = (byte) 0b10011010;
+            s.log.tell(new Log.InsertEntry(tag, length, value));
+        }
         return this;
     }
 
     private Behavior<Command> onSetARSNWindow(SetARSNWindow s) {
         this.aRCWindow = s.arcWindow;
-        s.log.tell(new Log.InsertEntry());
+        byte tag = (byte) 0b10010101;
+        short length = 10;
+        byte[] value = new byte[10];
+        value[0] = (byte) (this.sPi & 0xff);
+        value[1] = (byte) ((this.sPi >> 8) & 0xff);
+        byte[] bytes = ByteBuffer.allocate(8).putLong(s.arcWindow).array();
+        System.arraycopy(bytes, 0, value, 2, 8);
+        s.log.tell(new Log.InsertEntry(tag, length, value));
         return this;
     }
 
     private Behavior<Command> onStatusRequest(StatusRequest s) {
         SAState[] trans;
         if (this.prevState != SAState.NAN) {
+            byte tag = (byte) 0b10011111;
+            short length = 4;
+            byte[] value = new byte[4];
+            value[0] = (byte) (this.sPi & 0xff);
+            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            value[2] = this.prevState.toByte();
+            value[3] = this.state.toByte();
             trans = new SAState[2];
             trans[0] = this.prevState;
             trans[1] = this.state;
-            s.log.tell(new Log.InsertEntry());
+            s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
+            byte tag = (byte) 0b10101111;
+            short length = 3;
+            byte[] value = new byte[3];
+            value[0] = (byte) (this.sPi & 0xff);
+            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            value[2] = this.state.toByte();
             trans = new SAState[1];
             trans[0] = this.state;
-            s.log.tell(new Log.InsertEntry());
+            s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         s.replyTo.tell(new PDUManager.SAStatusRequestReply(this.sPi, trans, s.secMan));
 
@@ -223,7 +283,13 @@ public class SA extends AbstractBehavior<SA.Command> {
     }
 
     private Behavior<Command> onReadARSN(ReadARSN r) {
-        r.log.tell(new Log.InsertEntry());
+        byte tag = (byte) 0b10010000;
+        short length = 6;
+        byte[] value = new byte[6];
+        value[0] = (byte) (this.sPi & 0xff);
+        value[1] = (byte) ((this.sPi >> 8) & 0xff);
+        System.arraycopy(this.aRC, 0, value, 2, 4);
+        r.log.tell(new Log.InsertEntry(tag, length, value));
         r.replyTo.tell(new PDUManager.ReadARSNReply(this.sPi, this.aRC, r.secMan));
         return this;
     }

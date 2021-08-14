@@ -223,13 +223,27 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //TODO
+    //should work
     public static final class DumpLog implements Command {
+        final ActorRef<SecurityManager.Command> replyTo;
+        final ActorRef<Log.Command> log;
+
+        public DumpLog(ActorRef<SecurityManager.Command> replyTo, ActorRef<Log.Command> log) {
+            this.replyTo = replyTo;
+            this.log = log;
+        }
 
     }
 
-    //TODO
+    //should work
     public static final class EraseLog implements Command {
+        final ActorRef<SecurityManager.Command> replyTo;
+        final ActorRef<Log.Command> log;
+
+        public EraseLog(ActorRef<SecurityManager.Command> replyTo, ActorRef<Log.Command> log) {
+            this.replyTo = replyTo;
+            this.log = log;
+        }
 
     }
 
@@ -240,7 +254,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     //TODO
-    public static final class KeyVerificationReply {
+    public static final class KeyVerificationReply implements Command {
 
     }
 
@@ -258,6 +272,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
+    //TODO
     public static final class SAStatusRequestReply implements Command {
         final SAState[] trans;
         final short sPi;
@@ -270,7 +285,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         }
 
     }
-
+    //TODO: check if it works
     public static final class ReadARSNReply implements Command {
         final short sPi;
         final byte[] arc;
@@ -288,11 +303,28 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }*/
 
-    public static final class DumpLogReply {
+    //should work
+    public static final class DumpLogReply implements Command{
+        final byte[] value;
+        final ActorRef<SecurityManager.Command> replyTo;
+        public DumpLogReply(byte[] value, ActorRef<SecurityManager.Command> replyTo) {
+            this.value = value;
+            this.replyTo = replyTo;
+        }
 
     }
 
+    //should work
     public static final class EraseLogReply implements Command {
+        final int number;
+        final byte rem;
+        final ActorRef<SecurityManager.Command> replyTo;
+
+        public EraseLogReply(int number, byte rem, ActorRef<SecurityManager.Command> replyTo) {
+            this.number = number;
+            this.rem = rem;
+            this.replyTo = replyTo;
+        }
 
     }
 
@@ -323,6 +355,10 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
                 .onMessage(Ping.class, this::onPing)
                 .onMessage(KeyInventory.class, this::onInventory)
                 .onMessage(KeyInventoryReply.class, this::onInventoryReply)
+                .onMessage(DumpLog.class, this::onDumpLog)
+                .onMessage(EraseLog.class, this::onEraseLog)
+                .onMessage(DumpLogReply.class, this::onDumpLogReply)
+                .onMessage(EraseLogReply.class, this::onEraseLogReply)
                 .build();
     }
 
@@ -491,6 +527,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         value[1] = (byte) ((k.number >> 8) & 0xff);
         int j = 0;
         Iterator it = k.keyIdToState.entrySet().iterator();
+        //TODO: think about sense of the for-loop
         for (int i = 2; i < (2 * k.keyIdToState.size()) && it.hasNext(); i = i+2)
         {
             Map.Entry<Byte, KeyState> pair = (Map.Entry) it.next();
@@ -499,6 +536,36 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
             value[i+1] = 0x00;
         }
         k.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
+        return this;
+    }
+
+    private Behavior<Command> onDumpLog(DumpLog d) {
+        d.log.tell(new Log.DumpLog(getContext().getSelf(), d.replyTo));
+        return this;
+    }
+
+    private Behavior<Command> onEraseLog(EraseLog e) {
+        e.log.tell(new Log.EraseLog(getContext().getSelf(), e.replyTo));
+        return this;
+    }
+
+    private Behavior<Command> onDumpLogReply(DumpLogReply d) {
+        byte[] reply = new byte[d.value.length + 3];
+        byte tag = (byte) 0b10110011;
+        short length = (short) d.value.length;
+        /*reply[0] = tag;
+        reply[1] = (byte) (length & 0xff);
+        reply[2] = (byte) ((length >> 8) & 0xff);
+        System.arraycopy(d.value, 0, reply, 3, d.value.length);*/
+        d.replyTo.tell(new SecurityManager.PDUReply(tag, length, d.value));
+        return this;
+    }
+
+    private Behavior<Command> onEraseLogReply(EraseLogReply e) {
+        byte tag = (byte) 0b10110100;
+        short length = 5;
+        byte[] value = ByteBuffer.allocate(5).putInt(e.number).put(e.rem).array();
+        e.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
         return this;
     }
 }

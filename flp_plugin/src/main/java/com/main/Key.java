@@ -123,25 +123,35 @@ public class Key extends AbstractBehavior<Key.Command> {
     }
 
     private Behavior<Command> activate(Activate a) {
+        short length = 1;
+        byte[] value = new byte[1];
+        value[0] = this.keyId;
         //key cannot be activated from its state
         if(this.keyState != KeyState.PRE_ACTIVE) {
-            a.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00110010;
+            a.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
+            byte tag = (byte) 0b10000010;
             this.keyState = KeyState.ACTIVE;
-            a.log.tell(new Log.InsertEntry());
+            a.log.tell(new Log.InsertEntry(tag,length, value));
         }
         return this;
     }
 
     private Behavior<Command> deactivate(Deactivate d) {
+        short length = 1;
+        byte[] value = new byte[1];
+        value[0] = this.keyId;
         //key cannot be deactivated from its current state
         if (this.keyState != KeyState.ACTIVE) {
-            d.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00110011;
+            d.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
+            byte tag = (byte) 0b10000011;
             this.keyState = KeyState.DEACTIVATED;
-            d.log.tell(new Log.InsertEntry());
+            d.log.tell(new Log.InsertEntry(tag, length, value));
         }
         return this;
     }
@@ -149,7 +159,13 @@ public class Key extends AbstractBehavior<Key.Command> {
     private Behavior<Command> onRekey(CheckRekey c) {
         //key in wrong state
         if(this.keyState != KeyState.ACTIVE) {
-            c.log.tell(new Log.InsertEntry());
+            byte tag = (byte) 0b00000110;
+            short length = 3;
+            byte[] value = new byte[3];
+            value[0] = (byte) (c.sPi & 0xff);
+            value[1] = (byte) ((c.sPi >> 8) & 0xff);
+            value[2] = this.keyId;
+            c.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
             c.sam.tell(new SAManager.Rekey(c.sPi, this.keyId, c.arc, c.iv, c.log));
