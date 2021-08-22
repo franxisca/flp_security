@@ -21,6 +21,22 @@ public class Key extends AbstractBehavior<Key.Command> {
         }
     }
 
+    public static final class GetMaster implements Command {
+        final byte[] keys;
+        final byte[] iv;
+        final byte[] mac;
+        final ActorRef<Log.Command> log;
+        final ActorRef<KeyManager.Command> keyMan;
+
+        public GetMaster(byte[] keys, byte[] mac, byte[] iv, ActorRef<Log.Command> log, ActorRef<KeyManager.Command> keyMan) {
+            this.keys = keys;
+            this.mac = mac;
+            this.iv = iv;
+            this.log = log;
+            this.keyMan = keyMan;
+        }
+    }
+
     public static final class KeyReply implements KeyManager.Command , Command{
 
         final byte[] key;
@@ -43,6 +59,19 @@ public class Key extends AbstractBehavior<Key.Command> {
 
         public Deactivate(ActorRef<Log.Command> log) {
             this.log = log;
+        }
+    }
+
+    //TODO: act on reception of this message, aka encrypt and MAC challenge and send reply
+    public static final class Verify implements Command {
+        final byte[] challenge;
+        final ActorRef<Log.Command> log;
+        final ActorRef<PDUManager.Command> replyTo;
+
+        public Verify(byte[] challenge, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> replyTo) {
+            this.challenge = challenge;
+            this.log = log;
+            this.replyTo = replyTo;
         }
     }
 
@@ -114,6 +143,7 @@ public class Key extends AbstractBehavior<Key.Command> {
                 .onMessage(CheckRekey.class, this::onRekey)
                 .onMessage(GetKey.class, this::onGetKey)
                 .onMessage(KeyInventory.class, this::onInventory)
+                .onMessage(GetMaster.class, this::onMaster)
                 .build();
     }
 
@@ -176,6 +206,11 @@ public class Key extends AbstractBehavior<Key.Command> {
     private Behavior<Command> onInventory(KeyInventory k) {
         k.keyIdToState.put(this.keyId, this.keyState);
         k.keyMan.tell(new KeyManager.KeyInventory(k.firstKey, k.lastKey, k.log, k.pum, k.secMan, k.number, k.keyIdToState, k.currKey));
+        return this;
+    }
+
+    private Behavior<Command> onMaster(GetMaster m) {
+        m.keyMan.tell(new KeyManager.DecOtar(this.keyId, this.key, m.iv, m.mac, m.keys, m.log));
         return this;
     }
 }

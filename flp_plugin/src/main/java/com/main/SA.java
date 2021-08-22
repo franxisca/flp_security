@@ -14,6 +14,10 @@ public class SA extends AbstractBehavior<SA.Command> {
 
     public interface Command {}
 
+    public static final class verifySA implements Command {
+        final
+    }
+
     public static final class Stop implements Command {
         final ActorRef<Log.Command> log;
 

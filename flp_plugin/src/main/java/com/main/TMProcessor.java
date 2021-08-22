@@ -8,6 +8,9 @@ import akka.actor.typed.javadsl.Receive;
 
 public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
 
+    //unencrypted TM frame has 1115 bytes
+    //encrypted 1115 + 32 bytes
+
     public interface Command {}
 
     public static Behavior<Command> create() {

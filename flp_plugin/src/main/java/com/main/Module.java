@@ -11,6 +11,10 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     public interface Command {}
 
+    public static final class getTCInfo implements Command {
+
+    }
+
     public static final class PDUOut implements Command {
         final byte[] pdu;
 

@@ -16,9 +16,26 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     public interface Command {}
 
+
+    public static final class KeyDestruction implements Command {
+
+       final byte[] value;
+       //final ActorRef<PDUManager.Command> replyTo;
+       final ActorRef<KeyManager.Command> keyMan;
+       final ActorRef<Log.Command> log;
+       public KeyDestruction (byte[] value, ActorRef<KeyManager.Command> keyMan, ActorRef<Log.Command> log) {
+           this.value = value;
+           this.keyMan = keyMan;
+           this.log = log;
+          // this.replyTo = replyTo;
+       }
+    }
+    //TODO: upper bound for keys per module that can be active at the same time -> should be configurable
+    //TODO: to ask: user defined read ARSN?
+
     //SecurityManager needs to pass reference to KeyManager when issuing otar to PDUManager
     //TODO: store keys encrypted, fix key length (length 256 bits according to cipher)
-    public static final class Otar implements Command{
+    public static final class Otar implements Command {
         //final byte[] length;
         final byte[] value;
         final ActorRef<KeyManager.Command> replyTo;
@@ -45,6 +62,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     //should work
+    //TODO: do not deactivate keys still used by SAs, log error instead
     public static final class KeyDeactivation implements Command {
         final byte[] value;
         final ActorRef<KeyManager.Command> replyTo;
@@ -345,6 +363,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
                 .onMessage(Otar.class, this::onOtar)
                 .onMessage(KeyDeactivation.class, this::onDeactivate)
                 .onMessage(KeyActivation.class, this::onActivate)
+                .onMessage(KeyVerification.class, this::onVerification)
                 .onMessage(StartSA.class, this::onStartSA)
                 .onMessage(StopSA.class, this::onStopSA)
                 .onMessage(RekeySA.class, this::onRekey)
@@ -362,17 +381,44 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
                 .onMessage(EraseLog.class, this::onEraseLog)
                 .onMessage(DumpLogReply.class, this::onDumpLogReply)
                 .onMessage(EraseLogReply.class, this::onEraseLogReply)
+                .onMessage(KeyDestruction.class, this::onDestruction)
                 .build();
     }
 
-    private Behavior<Command> onOtar(Otar o) {
+    /*private Behavior<Command> onOtar(Otar o) {
         for (int i = 0; i < o.value.length; i = i + 3) {
             byte keyId = o.value[i];
-            byte[] key = new byte[2];
+            byte[] key = new byte[32];
+            for (int j = 0; j < 32; j++) {
+                key[]
+            }
             key[0] = o.value[i + 1];
             key[1] = o.value[i + 2];
             o.replyTo.tell(new KeyManager.OTAR(keyId, key, o.log));
         }
+        return this;
+    }*/
+
+    //TODO: decrypt keys first
+    private Behavior<Command> onOtar(Otar o) {
+        byte masterKey = o.value[0];
+        byte[] iv = new byte[12];
+        for (int i = 0; i < 12; i++) {
+            iv[i] = o.value[i+1];
+        }
+        byte[] mac = new byte[16];
+        byte[] keys = new byte[o.value.length - (1+12+16)];
+        int i = 1;
+        for (int j = 15; j >= 0; j--) {
+            mac[j] = o.value[o.value.length-i];
+            i++;
+        }
+        int k = 13;
+        for (int j = 0; j < (o.value.length - 29); j++) {
+            keys[j] = o.value[k];
+            k++;
+        }
+        o.replyTo.tell(new KeyManager.OTAR(masterKey, iv, mac, keys, o.log));
         return this;
     }
 
@@ -390,6 +436,20 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
             k.replyTo.tell(new KeyManager.DeactivateKey(keyId, k.log));
         }
 
+        return this;
+    }
+
+    private Behavior<Command> onVerification(KeyVerification k) {
+        byte[] challenge = new byte[32];
+        for(int i = 0; i < k.value.length; i++) {
+            byte keyId = k.value[i];
+            i++;
+            for (int j = 0; j < 32; j++) {
+                challenge[j] = k.value[i];
+                i++;
+            }
+            k.replyTo.tell(new KeyManager.VerifyKey(keyId, challenge, k.log, getContext().getSelf()));
+        }
         return this;
     }
 
@@ -583,6 +643,14 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         short length = 5;
         byte[] value = ByteBuffer.allocate(5).putInt(e.number).put(e.rem).array();
         e.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
+        return this;
+    }
+
+    private Behavior<Command> onDestruction (KeyDestruction k ) {
+        for (int i = 0; i < k.value.length; i++) {
+            byte keyId = k.value[i];
+            k.keyMan.tell(new KeyManager.KeyDestruction(keyId, k.log));
+        }
         return this;
     }
 }

@@ -4,6 +4,10 @@ import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
 import akka.actor.typed.javadsl.*;
 
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -36,6 +40,16 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
     }
 
+    public static final class KeyDestruction implements Command{
+        final byte keyId;
+        final ActorRef<Log.Command> log;
+
+        public KeyDestruction(byte keyId, ActorRef<Log.Command> log) {
+            this.keyId = keyId;
+            this.log = log;
+        }
+    }
+
     public static final class ActivateKey implements Command{
         final byte keyId;
         final ActorRef<Log.Command> log;
@@ -56,23 +70,56 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         }
     }
 
-    public static final class VerifyKey {
+    public static final class VerifyKey implements Command{
+        final byte keyId;
+        final byte[] challenge;
+        final ActorRef<Log.Command> log;
+        final ActorRef<PDUManager.Command> replyTo;
+
+        public VerifyKey(byte keyId, byte[] challenge, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> replyTo) {
+            this.keyId = keyId;
+            this.challenge = challenge;
+            this.log = log;
+            this.replyTo = replyTo;
+        }
 
     }
 
     public static final class OTAR implements Command{
 
-        final byte keyId;
-        final byte[] key;
-        final ActorRef<Log.Command> replyTo;
+        final byte masterKey;
+        final byte[] iv;
+        final byte[] mac;
+        final byte[] keys;
+        final ActorRef<Log.Command> log;
 
-        public OTAR(byte keyId, byte[] key, ActorRef<Log.Command> replyTo) {
+        public OTAR(byte masterKey, byte[] iv, byte[] mac, byte[] keys, ActorRef<Log.Command> log) {
 
-            this.keyId = keyId;
-            this.key = key;
-            this.replyTo = replyTo;
+            this.masterKey = masterKey;
+            this.iv = iv;
+            this.mac = mac;
+            this.keys = keys;
+            this.log = log;
         }
 
+    }
+
+    public static final class DecOtar implements Command {
+        final byte masterId;
+        final byte[] masterKey;
+        final byte[] iv;
+        final byte[] mac;
+        final byte[] keys;
+        final ActorRef<Log.Command> log;
+
+        public DecOtar(byte masterId, byte[] masterKey, byte[] iv, byte[] mac, byte[] keys, ActorRef<Log.Command> log) {
+            this.masterId = masterId;
+            this.masterKey = masterKey;
+            this.iv = iv;
+            this.mac = mac;
+            this.keys = keys;
+            this.log = log;
+        }
     }
 
     public static final class ReplaceKey {
@@ -122,9 +169,11 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
                 .onMessage(OTAR.class, this::onOtar)
                 .onMessage(ActivateKey.class, this::onActivate)
                 .onMessage(DeactivateKey.class, this::onDeactivate)
+                .onMessage(VerifyKey.class, this::onVerify)
                 .onMessage(Rekey.class, this::onRekey)
                 .onMessage(KeyRequested.class, this::onRequest)
                 .onMessage(KeyInventory.class, this::onInventory)
+                .onMessage(KeyDestruction.class, this::onDestruction)
                 .build();
     }
 
@@ -133,7 +182,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
     }
 
     //maybe not log here but send reply to SecurityManager?
-    private Behavior<Command> onOtar(OTAR o) {
+    /*private Behavior<Command> onOtar(OTAR o) {
         ActorRef<Key.Command> keyActor = keyIdToActor.get(o.keyId);
         //key with keyId to insert already exists, log accordingly
         if (keyActor != null) {
@@ -154,10 +203,82 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             o.replyTo.tell(new Log.InsertEntry(tag, length, value));
         }
         return this;
+    }*/
+
+    private Behavior<Command> onOtar(OTAR o) {
+        ActorRef<Key.Command> master = this.keyIdToActor.get(o.masterKey);
+        //masterKey does not exist
+        if(master == null) {
+            //TODO:log
+        }
+        else {
+
+            //TODO: how to handle otar, maybe don't store keys as actors thus it can be handled in KeyManager?
+            master.tell(new Key.GetMaster(o.keys, o.mac, o.iv, o.log, getContext().getSelf()));
+        }
+        return this;
+    }
+
+    private Behavior<Command> onDecOtar(DecOtar d) {
+
+        byte[] plain;
+        try {
+            plain = decrypt(d.keys, d.masterKey, d.iv, d.mac);
+        }
+        //TODO: is this an error in decryption? I suppose so
+        //TODO: log
+        catch (Exception e) {
+            plain = new byte[0];
+        }
+        //decryption worked
+        //TODO: assumes decryption returns plain text only
+        if(plain.length != 0) {
+            for(int i = 0; i < plain.length; i++) {
+                byte keyId = plain[i];
+                i++;
+                byte[] key = new byte[256];
+                for(int j = 0; j < 256; j++) {
+                    key[j] = plain[i];
+                    i++;
+                }
+                ActorRef<Key.Command> keyActor = this.keyIdToActor.get(keyId);
+                //key already exists
+                if(keyActor != null) {
+                    byte tag = (byte) 0b00000001;
+                    short length = 1;
+                    byte[] value = new byte[1];
+                    value[0] = keyId;
+                    d.log.tell(new Log.InsertEntry(tag, length, value));
+                }
+                //create new key, log it
+                else {
+                    keyActor = getContext().spawn(Key.create(keyId, key, false), "key" + keyId);
+                    this.keyIdToActor.put(keyId, keyActor);
+                    byte tag = (byte) 0b10000001;
+                    short length = 1;
+                    byte[] value = new byte[1];
+                    value[0] = keyId;
+                    d.log.tell(new Log.InsertEntry(tag, length, value));
+                }
+            }
+        }
+        return this;
+    }
+
+    //TODO: check if that works, does tag need to be appended to ciphertext?
+    public static byte[] decrypt(byte[] keys, byte[] masterKey, byte[] iv, byte[] mac) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        SecretKey secretKey = new SecretKeySpec(masterKey, "AES");
+        byte[] cipherText = new byte[keys.length + mac.length];
+        System.arraycopy(keys, 0, cipherText, 0, keys.length);
+        System.arraycopy(mac, 0, cipherText, keys.length, mac.length);
+        GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmParameterSpec);
+        return cipher.doFinal(cipherText);
     }
 
     private Behavior<Command> onActivate(ActivateKey a) {
-        ActorRef<Key.Command> keyActor = keyIdToActor.get(a.keyId);
+        ActorRef<Key.Command> keyActor = this.keyIdToActor.get(a.keyId);
         //key to activate does not exist
         if (keyActor == null) {
             byte tag = (byte) 0b00000010;
@@ -173,7 +294,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
     }
 
     private Behavior<Command> onDeactivate(DeactivateKey k) {
-        ActorRef<Key.Command> keyActor = keyIdToActor.get(k.keyId);
+        ActorRef<Key.Command> keyActor =this.keyIdToActor.get(k.keyId);
         //key to deactivate does not exist
         if(keyActor == null) {
             byte tag = (byte) 0b00000010;
@@ -184,6 +305,22 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         }
         else {
             keyActor.tell(new Key.Deactivate(k.log));
+        }
+        return this;
+    }
+
+    private Behavior<Command> onVerify(VerifyKey v) {
+        ActorRef<Key.Command> keyActor = this.keyIdToActor.get(v.keyId);
+        //key does not exist
+        if(keyActor == null) {
+            byte tag = (byte) 0b00000100;
+            short length = 1;
+            byte[] value = new byte[1];
+            value[0] = v.keyId;
+            v.log.tell(new Log.InsertEntry(tag, length , value));
+        }
+        else {
+            keyActor.tell(new Key.Verify(v.challenge, v.log, v.replyTo));
         }
         return this;
     }
@@ -207,12 +344,12 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
     }
 
     private Behavior<Command> onInventory(KeyInventory k){
-        ActorRef<Key.Command> keyActor = keyIdToActor.get(k.currKey);
+        ActorRef<Key.Command> keyActor = this.keyIdToActor.get(k.currKey);
         //k.currKey++;
         //int i = k.currKey + 1;
         while(keyActor == null && k.currKey <= k.lastKey) {
             k.currKey++;
-            keyActor = keyIdToActor.get(k.currKey);
+            keyActor = this.keyIdToActor.get(k.currKey);
         }
         if(keyActor == null){
             byte tag = (byte) 0b00000111;
@@ -239,4 +376,26 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         }
         return this;
     }
+
+    private Behavior<Command> onDestruction(KeyDestruction k) {
+        ActorRef<Key.Command> keyActor = this.keyIdToActor.get(k.keyId);
+        //key to erase does not exist
+        if (keyActor == null) {
+            byte tag = (byte) 0b00000110;
+            short length = 1;
+            byte[] value = new byte[1];
+            value[0] = k.keyId;
+            k.log.tell(new Log.InsertEntry(tag, length, value));
+        } else {
+            getContext().stop(keyActor);
+            this.keyIdToActor.remove(k.keyId);
+            byte tag = (byte) 0b10000110;
+            short length = 1;
+            byte[] value = new byte[1];
+            value[0] = k.keyId;
+            k.log.tell(new Log.InsertEntry(tag, length, value));
+        }
+        return this;
+    }
+
 }

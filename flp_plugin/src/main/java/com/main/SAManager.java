@@ -18,6 +18,10 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
 
     public interface Command {}
 
+    public static final class Verify implements Command {
+
+    }
+
     public static final class StatusRequest implements Command {
         final short sPi;
         final ActorRef<Log.Command> log;
