@@ -60,6 +60,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         }
     }
 
+    //TODO: do not deactivate if still used by SA
     public static final class DeactivateKey implements Command{
         final byte keyId;
         final ActorRef<Log.Command> log;
@@ -149,6 +150,41 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         }
     }
 
+    public static final class GetTCInfo implements Command {
+
+        //final short sPi;
+        final boolean[] vcId;
+        final byte[] primHeader;
+        final byte[] secHeader;
+        final byte[] data;
+        final int dataLength;
+        final byte[] secTrailer;
+        final byte[] crc;
+        final ActorRef<TCProcessor.Command> tcProc;
+        final ActorRef<Module.Command> parent;
+        //final ActorRef<KeyManager.Command> keyMan;
+        final byte keyId;
+        final byte[] arc;
+        final byte[] authMask;
+
+        public GetTCInfo(/*short sPi, */boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent, byte keyId, byte[] arc, byte[] authMask/*ActorRef<KeyManager.Command> keyMan*/) {
+            //this.sPi = sPi;
+            this.vcId = vcId;
+            this.primHeader = primHeader;
+            this.secHeader = secHeader;
+            this.data = data;
+            this.dataLength = dataLength;
+            this.secTrailer = secTrailer;
+            this.crc = crc;
+            this.tcProc = tcProc;
+            this.parent = parent;
+            //this.keyMan = keyMan;
+            this.keyId = keyId;
+            this.arc = arc;
+            this.authMask = authMask;
+        }
+    }
+
     public static final class KeyRequested implements Command {
 
     }
@@ -174,6 +210,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
                 .onMessage(KeyRequested.class, this::onRequest)
                 .onMessage(KeyInventory.class, this::onInventory)
                 .onMessage(KeyDestruction.class, this::onDestruction)
+                .onMessage(GetTCInfo.class, this::onTC)
                 .build();
     }
 
@@ -184,7 +221,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
     //maybe not log here but send reply to SecurityManager?
     /*private Behavior<Command> onOtar(OTAR o) {
         ActorRef<Key.Command> keyActor = keyIdToActor.get(o.keyId);
-        //key with keyId to insert already exists, log accordingly
+        //keyActor with keyId to insert already exists, log accordingly
         if (keyActor != null) {
             byte tag = (byte) 0b00000001;
             short length = 1;
@@ -192,9 +229,9 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             value[0] = o.keyId;
             o.replyTo.tell(new Log.InsertEntry(tag, length, value));
         }
-        //create new key, log it
+        //create new keyActor, log it
         else {
-            keyActor = getContext().spawn(Key.create(o.keyId, o.key, false), "key" + o.keyId);
+            keyActor = getContext().spawn(Key.create(o.keyId, o.keyActor, false), "keyActor" + o.keyId);
             keyIdToActor.put(o.keyId, keyActor);
             byte tag = (byte) 0b10000001;
             short length = 1;
@@ -242,7 +279,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
                     i++;
                 }
                 ActorRef<Key.Command> keyActor = this.keyIdToActor.get(keyId);
-                //key already exists
+                //keyActor already exists
                 if(keyActor != null) {
                     byte tag = (byte) 0b00000001;
                     short length = 1;
@@ -250,9 +287,9 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
                     value[0] = keyId;
                     d.log.tell(new Log.InsertEntry(tag, length, value));
                 }
-                //create new key, log it
+                //create new keyActor, log it
                 else {
-                    keyActor = getContext().spawn(Key.create(keyId, key, false), "key" + keyId);
+                    keyActor = getContext().spawn(Key.create(keyId, key, false), "keyActor" + keyId);
                     this.keyIdToActor.put(keyId, keyActor);
                     byte tag = (byte) 0b10000001;
                     short length = 1;
@@ -279,7 +316,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
     private Behavior<Command> onActivate(ActivateKey a) {
         ActorRef<Key.Command> keyActor = this.keyIdToActor.get(a.keyId);
-        //key to activate does not exist
+        //keyActor to activate does not exist
         if (keyActor == null) {
             byte tag = (byte) 0b00000010;
             short length = 1;
@@ -295,7 +332,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
     private Behavior<Command> onDeactivate(DeactivateKey k) {
         ActorRef<Key.Command> keyActor =this.keyIdToActor.get(k.keyId);
-        //key to deactivate does not exist
+        //keyActor to deactivate does not exist
         if(keyActor == null) {
             byte tag = (byte) 0b00000010;
             short length = 1;
@@ -311,7 +348,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
     private Behavior<Command> onVerify(VerifyKey v) {
         ActorRef<Key.Command> keyActor = this.keyIdToActor.get(v.keyId);
-        //key does not exist
+        //keyActor does not exist
         if(keyActor == null) {
             byte tag = (byte) 0b00000100;
             short length = 1;
@@ -327,7 +364,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
     private Behavior<Command> onRekey(Rekey r) {
         ActorRef<Key.Command> keyActor = keyIdToActor.get(r.keyId);
-        //key to rekey with does not exist
+        //keyActor to rekey with does not exist
         if(keyActor == null) {
             byte tag = (byte) 0b00010110;
             short length = 2;
@@ -369,7 +406,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             k.log.tell(new Log.InsertEntry(tag, length, value));
             k.pum.tell(new PDUManager.KeyInventoryReply(k.number, k.keyIdToState, k.secMan));
         }
-        //found a key to check
+        //found a keyActor to check
         else {
             k.number ++;
             keyActor.tell(new Key.KeyInventory(k.number, k.firstKey, k.lastKey, k.currKey, k.keyIdToState, k.pum, k.secMan, k.log, getContext().getSelf()));
@@ -379,7 +416,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
     private Behavior<Command> onDestruction(KeyDestruction k) {
         ActorRef<Key.Command> keyActor = this.keyIdToActor.get(k.keyId);
-        //key to erase does not exist
+        //keyActor to erase does not exist
         if (keyActor == null) {
             byte tag = (byte) 0b00000110;
             short length = 1;
@@ -394,6 +431,18 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             byte[] value = new byte[1];
             value[0] = k.keyId;
             k.log.tell(new Log.InsertEntry(tag, length, value));
+        }
+        return this;
+    }
+
+    private Behavior<Command> onTC(GetTCInfo tc) {
+        ActorRef<Key.Command> keyActor = this.keyIdToActor.get(tc.keyId);
+        //keyActor does not exist
+        if(keyActor == null) {
+            //TODO
+        }
+        else {
+            keyActor.tell(new Key.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, tc.arc, tc.authMask));
         }
         return this;
     }

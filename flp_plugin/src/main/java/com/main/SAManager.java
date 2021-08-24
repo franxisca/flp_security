@@ -6,17 +6,43 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
-import akka.japi.Pair;
 
-import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class SAManager extends AbstractBehavior<SAManager.Command> {
 
     public interface Command {}
+
+    public static final class GetTCInfo implements Command {
+
+        final short sPi;
+        final boolean[] vcId;
+        final byte[] primHeader;
+        final byte[] secHeader;
+        final byte[] data;
+        final int dataLength;
+        final byte[] secTrailer;
+        final byte[] crc;
+        final ActorRef<TCProcessor.Command> tcProc;
+        final ActorRef<Module.Command> parent;
+        final ActorRef<KeyManager.Command> keyMan;
+
+        public GetTCInfo(short sPi, boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent, ActorRef<KeyManager.Command> keyMan) {
+            this.sPi = sPi;
+            this.vcId = vcId;
+            this.primHeader = primHeader;
+            this.secHeader = secHeader;
+            this.data = data;
+            this.dataLength = dataLength;
+            this.secTrailer = secTrailer;
+            this.crc = crc;
+            this.tcProc = tcProc;
+            this.parent = parent;
+            this.keyMan = keyMan;
+        }
+    }
 
     public static final class Verify implements Command {
 
@@ -54,13 +80,15 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         final byte[] arc;
         final byte[] iv;
         final ActorRef<Log.Command> log;
+        final ActorRef<Key.Command> keyActor;
 
-        public Rekey(short sPi, byte keyId, byte[] arc, byte[] iv, ActorRef<Log.Command> log) {
+        public Rekey(short sPi, byte keyId, byte[] arc, byte[] iv, ActorRef<Log.Command> log, ActorRef<Key.Command> keyActor) {
             this.sPi = sPi;
             this.keyId = keyId;
             this.arc = arc;
             this.iv = iv;
             this.log = log;
+            this.keyActor = keyActor;
         }
 
     }
@@ -91,6 +119,20 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             this.replyTo = replyTo;
         }
 
+    }
+
+    public static final class ReadARSNWindow implements Command {
+        final short sPi;
+        final ActorRef<Log.Command> log;
+        final ActorRef<PDUManager.Command> pum;
+        final ActorRef<SecurityManager.Command> replyTo;
+
+        public ReadARSNWindow(short sPi, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> pum, ActorRef<SecurityManager.Command> replyTo) {
+            this.sPi = sPi;
+            this.log = log;
+            this.pum = pum;
+            this.replyTo = replyTo;
+        }
     }
 
     public static final class SetARSNWindow implements Command {
@@ -151,6 +193,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
                 .onMessage(SetARSNWindow.class, this::onSetARSNWindow)
                 .onMessage(StatusRequest.class, this::onStatusRequest)
                 .onMessage(ReadARSN.class, this::onReadARSN)
+                .onMessage(ReadARSNWindow.class, this::onReadARSNWindow)
+                .onMessage(GetTCInfo.class, this::onTC)
                 .build();
     }
 
@@ -184,7 +228,7 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             r.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
-            saActor.tell(new SA.Rekey(r.keyId, r.arc, r.iv, r.log));
+            saActor.tell(new SA.Rekey(r.keyId, r.arc, r.iv, r.log, r.keyActor));
         }
         return this;
     }
@@ -277,6 +321,23 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         return this;
     }
 
+    private Behavior<Command> onReadARSNWindow(ReadARSNWindow r) {
+        ActorRef<SA.Command> saActor = this.sPiToActor.get(r.sPi);
+        //no SA with this spi
+        if(saActor == null) {
+            byte tag = (byte) 0b01010000;
+            short length = 2;
+            byte[] value = new byte[2];
+            value[0] = (byte) (r.sPi & 0xff);
+            value[1] = (byte) ((r.sPi >> 8) & 0xff);
+            r.log.tell(new Log.InsertEntry(tag, length, value));
+        }
+        else {
+            saActor.tell(new SA.ReadARSNWindow(r.log, r.pum, r.replyTo));
+        }
+        return this;
+    }
+
     private Behavior<Command> onStart(Start s) {
         ActorRef<SA.Command> saActor = this.sPiToActor.get(s.sPi);
         //no SA with this spi
@@ -292,6 +353,18 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         }
         else {
             saActor.tell(new SA.Start(s.channel, s.log));
+        }
+        return this;
+    }
+
+    private Behavior<Command> onTC(GetTCInfo tc) {
+        ActorRef<SA.Command> saActor = this.sPiToActor.get(tc.sPi);
+        //TODO: what do I do when SA is not found -> FSR
+        if(saActor == null) {
+
+        }
+        else {
+            saActor.tell(new SA.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, tc.keyMan));
         }
         return this;
     }

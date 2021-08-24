@@ -31,10 +31,9 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
        }
     }
     //TODO: upper bound for keys per module that can be active at the same time -> should be configurable
-    //TODO: to ask: user defined read ARSN?
 
     //SecurityManager needs to pass reference to KeyManager when issuing otar to PDUManager
-    //TODO: store keys encrypted, fix key length (length 256 bits according to cipher)
+    //should work
     public static final class Otar implements Command {
         //final byte[] length;
         final byte[] value;
@@ -62,7 +61,6 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     //should work
-    //TODO: do not deactivate keys still used by SAs, log error instead
     public static final class KeyDeactivation implements Command {
         final byte[] value;
         final ActorRef<KeyManager.Command> replyTo;
@@ -106,8 +104,8 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //TODO: check if multiple states per SA for different channels
-    //TODO: how is channel "applicable" for SA?
+    //TODO: fixed length for VC ids? how to store them
+    //TODO: store SAs for VCs
     //value contains only one SPI but might contain multiple GVC/GMAP ids to add to SA, how is a channel not applicable to SA?
     //ignoring that maybe not applicable
     //channel ids have 32 bit (size of int)
@@ -230,6 +228,20 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
+    public static final class ReadARSNWindow implements Command {
+        final byte[] value;
+        final ActorRef<SAManager.Command> sam;
+        final ActorRef<Log.Command> log;
+        final ActorRef<SecurityManager.Command> replyTo;
+
+        public ReadARSNWindow(byte[] value, ActorRef<SAManager.Command> sam, ActorRef<Log.Command> log, ActorRef<SecurityManager.Command> replyTo) {
+            this.value = value;
+            this.sam = sam;
+            this.log = log;
+            this.replyTo = replyTo;
+        }
+    }
+
     //should work
     public static final class Ping implements Command {
 
@@ -274,7 +286,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //TODO, ask in meeting because no idea what key verification does
+    //TODO, ask in meeting because no idea what keyActor verification does
     public static final class KeyVerificationReply implements Command {
 
     }
@@ -317,6 +329,18 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
             this.replyTo = replyTo;
         }
 
+    }
+
+    public static final class ReadARSNWindowReply implements Command {
+        final short sPi;
+        final long arcWindow;
+        final ActorRef<SecurityManager.Command> replyTo;
+
+        public ReadARSNWindowReply(short sPi, long arcWindow, ActorRef<SecurityManager.Command> replyTo) {
+            this.sPi = sPi;
+            this.arcWindow = arcWindow;
+            this.replyTo = replyTo;
+        }
     }
 
     //ping can be directly answered
@@ -373,6 +397,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
                 .onMessage(SAStatusRequest.class, this::onStatusRequest)
                 .onMessage(SAStatusRequestReply.class, this::onStatusReply)
                 .onMessage(ReadARSN.class, this::onReadARSN)
+                .onMessage(ReadARSNWindow.class, this::onReadARSNWindow)
                 .onMessage(ReadARSNReply.class, this::onReadARSNReply)
                 .onMessage(Ping.class, this::onPing)
                 .onMessage(KeyInventory.class, this::onInventory)
@@ -388,18 +413,18 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     /*private Behavior<Command> onOtar(Otar o) {
         for (int i = 0; i < o.value.length; i = i + 3) {
             byte keyId = o.value[i];
-            byte[] key = new byte[32];
+            byte[] keyActor = new byte[32];
             for (int j = 0; j < 32; j++) {
-                key[]
+                keyActor[]
             }
-            key[0] = o.value[i + 1];
-            key[1] = o.value[i + 2];
-            o.replyTo.tell(new KeyManager.OTAR(keyId, key, o.log));
+            keyActor[0] = o.value[i + 1];
+            keyActor[1] = o.value[i + 2];
+            o.replyTo.tell(new KeyManager.OTAR(keyId, keyActor, o.log));
         }
         return this;
     }*/
 
-    //TODO: decrypt keys first
+    //should work, TODO: check decryption
     private Behavior<Command> onOtar(Otar o) {
         byte masterKey = o.value[0];
         byte[] iv = new byte[12];
@@ -576,6 +601,32 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         short length = 6;
         //2 byte spi, 4 byte arc
         byte[] value = new byte[6];
+        value[0] = (byte) (r.sPi & 0xff);
+        value[1] = (byte) ((r.sPi >> 8) & 0xff);
+        System.arraycopy(r.arc, 0, value, 2, 4);
+        r.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
+        return this;
+    }
+
+    private Behavior<Command> onReadARSNWindow(ReadARSNWindow r) {
+        ByteBuffer bb = ByteBuffer.allocate(2);
+        bb.put(r.value[0]);
+        bb.put(r.value[1]);
+        short sPi = bb.getShort(0);
+        r.sam.tell(new SAManager.ReadARSNWindow(sPi, r.log, getContext().getSelf(), r.replyTo));
+        return this;
+    }
+
+    //TODO: arcWindow length
+    private Behavior<Command> onReadARSNWindowReply(ReadARSNWindowReply r) {
+        byte tag = (byte) 0b11010000;
+        short length = 10;
+        //2 byte sPi, 8 byte arcWindow
+        byte[] value = new byte[10];
+        value[0] = (byte) (r.sPi & 0xff);
+        value[1] = (byte) ((r.sPi >> 8) & 0xff);
+        byte[] bytes = ByteBuffer.allocate(8).putLong(r.arcWindow).array();
+        System.arraycopy(bytes, 0, value, 2, 8);
         r.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
         return this;
     }
@@ -609,7 +660,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         {
             Map.Entry<Byte, KeyState> pair = (Map.Entry) it.next();
             value[i] = pair.getKey();
-            //encode keyState as byte
+            //TODO: encode keyState as byte
             value[i+1] = pair.getValue().toByte();
         }
         k.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));

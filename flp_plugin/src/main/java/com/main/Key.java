@@ -62,6 +62,16 @@ public class Key extends AbstractBehavior<Key.Command> {
         }
     }
 
+    public static final class Used implements Command {
+        final short sPi;
+
+        public Used(short sPi) {
+            this.sPi = sPi;
+        }
+    }
+
+    public static final class NotUsed implements Command {}
+
     //TODO: act on reception of this message, aka encrypt and MAC challenge and send reply
     public static final class Verify implements Command {
         final byte[] challenge;
@@ -117,6 +127,41 @@ public class Key extends AbstractBehavior<Key.Command> {
         }
     }
 
+    public static final class GetTCInfo implements Command {
+
+        //final short sPi;
+        final boolean[] vcId;
+        final byte[] primHeader;
+        final byte[] secHeader;
+        final byte[] data;
+        final int dataLength;
+        final byte[] secTrailer;
+        final byte[] crc;
+        final ActorRef<TCProcessor.Command> tcProc;
+        final ActorRef<Module.Command> parent;
+        //final ActorRef<KeyManager.Command> keyMan;
+        //final byte keyId;
+        final byte[] arc;
+        final byte[] authMask;
+
+        public GetTCInfo(/*short sPi, */boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent/*, byte keyId*/, byte[] arc, byte[] authMask/*ActorRef<KeyManager.Command> keyMan*/) {
+            //this.sPi = sPi;
+            this.vcId = vcId;
+            this.primHeader = primHeader;
+            this.secHeader = secHeader;
+            this.data = data;
+            this.dataLength = dataLength;
+            this.secTrailer = secTrailer;
+            this.crc = crc;
+            this.tcProc = tcProc;
+            this.parent = parent;
+            //this.keyMan = keyMan;
+            //this.keyId = keyId;
+            this.arc = arc;
+            this.authMask = authMask;
+        }
+    }
+
     public static Behavior<Command> create(byte keyId, byte[] key, boolean startUp) {
         return Behaviors.setup(context -> new Key(context, keyId, key, startUp));
     }
@@ -125,6 +170,7 @@ public class Key extends AbstractBehavior<Key.Command> {
     private final byte[] key;
     private KeyState keyState;
     private boolean startUp;
+    private boolean inUse;
 
     private Key(ActorContext<Command> context, byte keyId, byte[] key, boolean startUp){
         super(context);
@@ -144,6 +190,9 @@ public class Key extends AbstractBehavior<Key.Command> {
                 .onMessage(GetKey.class, this::onGetKey)
                 .onMessage(KeyInventory.class, this::onInventory)
                 .onMessage(GetMaster.class, this::onMaster)
+                .onMessage(GetTCInfo.class, this::onTC)
+                .onMessage(Used.class, this::onUsed)
+                .onMessage(NotUsed.class, this::onNotUsed)
                 .build();
     }
 
@@ -156,7 +205,7 @@ public class Key extends AbstractBehavior<Key.Command> {
         short length = 1;
         byte[] value = new byte[1];
         value[0] = this.keyId;
-        //key cannot be activated from its state
+        //keyActor cannot be activated from its state
         if(this.keyState != KeyState.PRE_ACTIVE) {
             byte tag = (byte) 0b00110010;
             a.log.tell(new Log.InsertEntry(tag, length, value));
@@ -173,9 +222,14 @@ public class Key extends AbstractBehavior<Key.Command> {
         short length = 1;
         byte[] value = new byte[1];
         value[0] = this.keyId;
-        //key cannot be deactivated from its current state
+        //keyActor cannot be deactivated from its current state
         if (this.keyState != KeyState.ACTIVE) {
             byte tag = (byte) 0b00110011;
+            d.log.tell(new Log.InsertEntry(tag, length, value));
+        }
+        //key is still used by an SA
+        else if(this.inUse) {
+            byte tag = (byte) 0b00010011;
             d.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
@@ -187,7 +241,7 @@ public class Key extends AbstractBehavior<Key.Command> {
     }
 
     private Behavior<Command> onRekey(CheckRekey c) {
-        //key in wrong state
+        //keyActor in wrong state
         if(this.keyState != KeyState.ACTIVE) {
             byte tag = (byte) 0b00000110;
             short length = 3;
@@ -198,7 +252,7 @@ public class Key extends AbstractBehavior<Key.Command> {
             c.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
-            c.sam.tell(new SAManager.Rekey(c.sPi, this.keyId, c.arc, c.iv, c.log));
+            c.sam.tell(new SAManager.Rekey(c.sPi, this.keyId, c.arc, c.iv, c.log, getContext().getSelf()));
         }
         return this;
     }
@@ -211,6 +265,28 @@ public class Key extends AbstractBehavior<Key.Command> {
 
     private Behavior<Command> onMaster(GetMaster m) {
         m.keyMan.tell(new KeyManager.DecOtar(this.keyId, this.key, m.iv, m.mac, m.keys, m.log));
+        return this;
+    }
+
+    private Behavior<Command> onTC(GetTCInfo tc) {
+        //keyActor is not ACTIVE, should not happen
+        if(this.keyState != KeyState.ACTIVE) {
+            //TODO
+        }
+        //return keyActor to TCProcessor
+        else {
+            tc.tcProc.tell(new TCProcessor.TC(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.arc, tc.authMask, tc.parent, this.keyId, this.key));
+        }
+        return this;
+    }
+
+    private Behavior<Command> onUsed(Used u) {
+        this.inUse = true;
+        return this;
+    }
+
+    private Behavior<Command> onNotUsed (NotUsed n) {
+        this.inUse = false;
         return this;
     }
 }

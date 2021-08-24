@@ -13,6 +13,33 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
 
     public interface Command {}
 
+    public static final class GetTCInfo implements Command {
+
+        final short sPi;
+        final boolean[] vcId;
+        final byte[] primHeader;
+        final byte[] secHeader;
+        final byte[] data;
+        final int dataLength;
+        final byte[] secTrailer;
+        final byte[] crc;
+        final ActorRef<TCProcessor.Command> tcProc;
+        final ActorRef<Module.Command> parent;
+
+        public GetTCInfo(short sPi, boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent) {
+            this.sPi = sPi;
+            this.vcId = vcId;
+            this.primHeader = primHeader;
+            this.secHeader = secHeader;
+            this.data = data;
+            this.dataLength = dataLength;
+            this.secTrailer = secTrailer;
+            this.crc = crc;
+            this.tcProc = tcProc;
+            this.parent = parent;
+        }
+    }
+
     public static final class PDUReply implements Command {
         final byte tag;
         final short length;
@@ -56,6 +83,7 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
         return newReceiveBuilder()
                 .onMessage(PDU.class, this::onPDU)
                 .onMessage(PDUReply.class, this::onPDUReply)
+                .onMessage(GetTCInfo.class, this::onTC)
                 .build();
     }
 
@@ -76,22 +104,22 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
                 this.pduMan.tell(new PDUManager.Otar(value, this.keyMan, this.log));
                 break;
             }
-            //key activation
+            //keyActor activation
             case (byte) 0b00000010: {
                 this.pduMan.tell(new PDUManager.KeyActivation(value, this.keyMan, this.log));
                 break;
             }
-            //key deactivation
+            //keyActor deactivation
             case (byte) 0b00000011: {
                 this.pduMan.tell(new PDUManager.KeyDeactivation(value, this.keyMan, this.log));
                 break;
             }
-            //key verification
+            //keyActor verification
             case (byte) 0b00000100: {
                 this.pduMan.tell(new PDUManager.KeyVerification(value, this.keyMan, this.log));
                 break;
             }
-            //key inventory
+            //keyActor inventory
             case (byte) 0b00000111: {
                 this.pduMan.tell(new PDUManager.KeyInventory(value, this.keyMan, getContext().getSelf(), this.log));
                 break;
@@ -157,6 +185,11 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
                 this.pduMan.tell(new PDUManager.AlarmFlagReset());
                 break;
             }
+
+            case (byte) 0b01010000: {
+                this.pduMan.tell(new PDUManager.ReadARSNWindow(value, this.saMan, this.log, getContext().getSelf()));
+            }
+
             default:
                 break;
 
@@ -171,6 +204,11 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
         reply[2] = (byte) ((p.length >> 8) & 0xff);
         System.arraycopy(p.value, 0, reply, 3, p.length);
         this.parent.tell(new Module.PDUOut(reply));
+        return this;
+    }
+
+    private Behavior<Command> onTC(GetTCInfo tc) {
+        this.saMan.tell(new SAManager.GetTCInfo(tc.sPi, tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, this.keyMan));
         return this;
     }
 }

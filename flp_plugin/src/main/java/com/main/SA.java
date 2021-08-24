@@ -7,16 +7,18 @@ import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.BitSet;
 
 public class SA extends AbstractBehavior<SA.Command> {
 
     public interface Command {}
 
-    public static final class verifySA implements Command {
+    /*public static final class verifySA implements Command {
         final
-    }
+    }*/
 
     public static final class Stop implements Command {
         final ActorRef<Log.Command> log;
@@ -41,12 +43,14 @@ public class SA extends AbstractBehavior<SA.Command> {
         final byte[] arc;
         final byte[] iv;
         final ActorRef<Log.Command> log;
+        final ActorRef<Key.Command> keyActor;
 
-        public Rekey(byte keyId, byte[] arc, byte[] iv, ActorRef<Log.Command> log) {
+        public Rekey(byte keyId, byte[] arc, byte[] iv, ActorRef<Log.Command> log, ActorRef<Key.Command> keyActor) {
             this.keyId = keyId;
             this.arc = arc;
             this.iv = iv;
             this.log = log;
+            this.keyActor = keyActor;
         }
     }
 
@@ -104,6 +108,47 @@ public class SA extends AbstractBehavior<SA.Command> {
         }
     }
 
+    public static final class ReadARSNWindow implements Command {
+        final ActorRef<Log.Command> log;
+        final ActorRef<PDUManager.Command> replyTo;
+        final ActorRef<SecurityManager.Command> secMan;
+
+        public ReadARSNWindow(ActorRef<Log.Command> log, ActorRef<PDUManager.Command> replyTo, ActorRef<SecurityManager.Command> secMan) {
+            this.log = log;
+            this.replyTo = replyTo;
+            this.secMan = secMan;
+        }
+    }
+
+    public static final class GetTCInfo implements Command {
+
+        //final short sPi;
+        final boolean[] vcId;
+        final byte[] primHeader;
+        final byte[] secHeader;
+        final byte[] data;
+        final int dataLength;
+        final byte[] secTrailer;
+        final byte[] crc;
+        final ActorRef<TCProcessor.Command> tcProc;
+        final ActorRef<Module.Command> parent;
+        final ActorRef<KeyManager.Command> keyMan;
+
+        public GetTCInfo(/*short sPi, */boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent, ActorRef<KeyManager.Command> keyMan) {
+            //this.sPi = sPi;
+            this.vcId = vcId;
+            this.primHeader = primHeader;
+            this.secHeader = secHeader;
+            this.data = data;
+            this.dataLength = dataLength;
+            this.secTrailer = secTrailer;
+            this.crc = crc;
+            this.tcProc = tcProc;
+            this.parent = parent;
+            this.keyMan = keyMan;
+        }
+    }
+
     public static Behavior<Command> create(short sPi, int authMaskLength, byte[] authBitMask, boolean critical) {
         return Behaviors.setup(context -> new SA(context, sPi, authMaskLength, authBitMask, critical));
     }
@@ -115,9 +160,11 @@ public class SA extends AbstractBehavior<SA.Command> {
     private final byte[] authBitMask;
     private long aRCWindow;
     private byte keyId;
+    private ActorRef<Key.Command> keyActor;
     private SAState state;
     private SAState prevState;
     //maybe there are multiple channels
+    //private ArrayList<Integer> channels;
     private ArrayList<Integer> channels;
     //private long channelId;
     private final boolean critical;
@@ -155,6 +202,8 @@ public class SA extends AbstractBehavior<SA.Command> {
                 .onMessage(SetARSNWindow.class, this::onSetARSNWindow)
                 .onMessage(StatusRequest.class, this::onStatusRequest)
                 .onMessage(ReadARSN.class, this::onReadARSN)
+                .onMessage(ReadARSNWindow.class, this::onReadARSNWindow)
+                .onMessage(GetTCInfo.class, this::onTC)
                 .build();
     }
 
@@ -184,7 +233,7 @@ public class SA extends AbstractBehavior<SA.Command> {
 
     private Behavior<Command> onRekey(Rekey r) {
 
-        //already checked if key exists and is in right state
+        //already checked if keyActor exists and is in right state
 
         short length = 3;
         byte[] value = new byte[3];
@@ -198,6 +247,7 @@ public class SA extends AbstractBehavior<SA.Command> {
         }
         else {
             this.keyId = r.keyId;
+            this.keyActor =r.keyActor;
             this.state = SAState.KEYED;
             this.prevState = SAState.UNKEYED;
             this.aRC = r.arc;
@@ -205,6 +255,7 @@ public class SA extends AbstractBehavior<SA.Command> {
             //log success
             byte tag = (byte) 0b10010110;
             r.log.tell(new Log.InsertEntry(tag, length, value));
+            r.keyActor.tell(new Key.Used(this.sPi));
         }
 
         return this;
@@ -223,6 +274,8 @@ public class SA extends AbstractBehavior<SA.Command> {
         else {
             byte tag = (byte) 0b10011001;
             this.keyId = -1;
+            this.keyActor.tell(new Key.NotUsed());
+            this.keyActor = null;
             this.state = SAState.UNKEYED;
             this.prevState = SAState.KEYED;
             e.log.tell(new Log.InsertEntry(tag, length, value));
@@ -312,9 +365,22 @@ public class SA extends AbstractBehavior<SA.Command> {
         return this;
     }
 
+    private Behavior<Command> onReadARSNWindow(ReadARSNWindow r) {
+        byte tag = (byte) 0b11010000;
+        short length = 10;
+        byte[] value = new byte[10];
+        value[0] = (byte) (this.sPi & 0xff);
+        value[1] = (byte) ((this.sPi >> 8) & 0xff);
+        byte[] bytes = ByteBuffer.allocate(8).putLong(this.aRCWindow).array();
+        System.arraycopy(bytes, 0, value, 2, 8);
+        r.log.tell(new Log.InsertEntry(tag, length, value));
+        r.replyTo.tell(new PDUManager.ReadARSNWindowReply(this.sPi, this.aRCWindow, r.secMan));
+        return this;
+    }
+
     //TODO: multiple states per SA? for differrent channels?
     private Behavior<Command> onStart(Start s) {
-        if(this.state != SAState.KEYED) {
+        if(this.state != SAState.KEYED && this.state != SAState.OPERATIONAL) {
             byte tag = (byte) 0b00101011;
             short length = 6;
             byte[] value = new byte[6];
@@ -324,6 +390,7 @@ public class SA extends AbstractBehavior<SA.Command> {
             System.arraycopy(bytes, 0, value, 2, 4);
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
+        //TODO: ??? wtf how are channels sometimes 6 bits and sometimes 32? (StartSA PDU says 32)
         else {
             this.state = SAState.OPERATIONAL;
             this.channels.add(s.channel);
@@ -336,6 +403,40 @@ public class SA extends AbstractBehavior<SA.Command> {
             System.arraycopy(bytes, 0, value, 2, 4);
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
+        return this;
+    }
+
+    //TODO: do not deactivate keys still used by SAs, but why not double check if keyActor is active
+    private Behavior<Command> onTC(GetTCInfo tc) {
+        //SA not in the right state
+        if(this.state != SAState.OPERATIONAL) {
+            //TODO: Bad SA flag?
+        }
+        //SA not applied on channel
+        //TODO: fix channel length
+        //channel length fixed to 32 bits and stored as integer
+        byte[] chan;
+        BitSet bits = new BitSet(tc.vcId.length);
+        for(int i = 0; i < tc.vcId.length; i++) {
+            if(tc.vcId[i]) {
+                bits.set(i);
+            }
+        }
+        //TODO: that's ugly but chan is a one byte array
+        chan = bits.toByteArray();
+        byte[] channel = new byte[4];
+        channel[0] = 0;
+        channel[1] = 0;
+        channel[2] = 0;
+        System.arraycopy(chan, 0, channel, 3, 1);
+        int channelInt = ByteBuffer.wrap(channel).getInt();
+        if(!this.channels.contains(channelInt)) {
+            //TODO: Bad SA flag?
+        }
+        else {
+            tc.keyMan.tell(new KeyManager.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, this.keyId, this.aRC, this.authBitMask));
+        }
+        //TODO: get keyActor, need keyManager reference for that :(
         return this;
     }
 }
