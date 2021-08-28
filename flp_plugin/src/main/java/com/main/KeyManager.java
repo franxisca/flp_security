@@ -60,7 +60,8 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         }
     }
 
-    //TODO: do not deactivate if still used by SA
+    public static final class ActivateReply implements Command {}
+
     public static final class DeactivateKey implements Command{
         final byte keyId;
         final ActorRef<Log.Command> log;
@@ -189,14 +190,18 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
     }
 
-    public static Behavior<Command> create() {
-        return Behaviors.setup(context -> new KeyManager(context));
+    private final int activeKeys;
+    private int currentlyActive;
+
+    public static Behavior<Command> create(int activeKeys) {
+        return Behaviors.setup(context -> new KeyManager(context, activeKeys));
     }
 
     private final Map<Byte, ActorRef<Key.Command>> keyIdToActor = new HashMap<>();
 
-    private KeyManager(ActorContext<Command> context){
+    private KeyManager(ActorContext<Command> context, int activeKeys){
         super(context);
+        this.activeKeys = activeKeys;
     }
 
     @Override
@@ -204,6 +209,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         return newReceiveBuilder()
                 .onMessage(OTAR.class, this::onOtar)
                 .onMessage(ActivateKey.class, this::onActivate)
+                .onMessage(ActivateReply.class, this::onActivateReply)
                 .onMessage(DeactivateKey.class, this::onDeactivate)
                 .onMessage(VerifyKey.class, this::onVerify)
                 .onMessage(Rekey.class, this::onRekey)
@@ -324,9 +330,22 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             value[0] = a.keyId;
             a.log.tell(new Log.InsertEntry(tag, length, value));
         }
+        //already too many keys are active
+        else if(this.currentlyActive >= activeKeys) {
+            byte tag = (byte) 0b11110010;
+            short length = 1;
+            byte[] value = new byte[1];
+            value[0] = a.keyId;
+            a.log.tell(new Log.InsertEntry(tag, length, value));
+        }
         else {
             keyActor.tell(new Key.Activate(a.log));
         }
+        return this;
+    }
+
+    private Behavior<Command> onActivateReply(ActivateReply a) {
+        this.currentlyActive++;
         return this;
     }
 

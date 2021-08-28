@@ -152,11 +152,13 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         final short sPi;
         final int channel;
         final ActorRef<Log.Command> log;
+        final ActorRef<Module.Command> module;
 
-        public Start(short sPi, int channel, ActorRef<Log.Command> log) {
+        public Start(short sPi, int channel, ActorRef<Log.Command> log, ActorRef<Module.Command> module) {
             this.sPi = sPi;
             this.channel = channel;
             this.log = log;
+            this.module = module;
         }
 
     }
@@ -352,7 +354,7 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
-            saActor.tell(new SA.Start(s.channel, s.log));
+            saActor.tell(new SA.Start(s.channel, s.log, s.module));
         }
         return this;
     }

@@ -31,10 +31,12 @@ public class SA extends AbstractBehavior<SA.Command> {
     public static final class Start implements Command {
         final int channel;
         final ActorRef<Log.Command> log;
+        final ActorRef<Module.Command> module;
 
-        public Start(int channel, ActorRef<Log.Command> log) {
+        public Start(int channel, ActorRef<Log.Command> log, ActorRef<Module.Command> module) {
             this.channel = channel;
             this.log = log;
+            this.module = module;
         }
     }
 
@@ -378,7 +380,6 @@ public class SA extends AbstractBehavior<SA.Command> {
         return this;
     }
 
-    //TODO: multiple states per SA? for differrent channels?
     private Behavior<Command> onStart(Start s) {
         if(this.state != SAState.KEYED && this.state != SAState.OPERATIONAL) {
             byte tag = (byte) 0b00101011;
@@ -390,10 +391,10 @@ public class SA extends AbstractBehavior<SA.Command> {
             System.arraycopy(bytes, 0, value, 2, 4);
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
-        //TODO: ??? wtf how are channels sometimes 6 bits and sometimes 32? (StartSA PDU says 32)
         else {
             this.state = SAState.OPERATIONAL;
             this.channels.add(s.channel);
+            s.module.tell(new Module.MapVC(s.channel, getContext().getSelf()));
             byte tag = (byte) 0b10011011;
             short length = 6;
             byte[] value = new byte[6];

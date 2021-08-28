@@ -31,6 +31,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
        }
     }
     //TODO: upper bound for keys per module that can be active at the same time -> should be configurable
+    //TODO: configurable how? for now needs to be passed to Module actor on creation, does it need to be changed? hard bound? could be lost due to asynchronous communication
 
     //SecurityManager needs to pass reference to KeyManager when issuing otar to PDUManager
     //should work
@@ -104,7 +105,6 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //TODO: fixed length for VC ids? how to store them
     //TODO: store SAs for VCs
     //value contains only one SPI but might contain multiple GVC/GMAP ids to add to SA, how is a channel not applicable to SA?
     //ignoring that maybe not applicable
@@ -113,11 +113,14 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         final byte[] value;
         final ActorRef<SAManager.Command> sam;
         final ActorRef<Log.Command> log;
+        final ActorRef<Module.Command> module;
 
-        public StartSA (byte[] value, ActorRef<SAManager.Command> sam, ActorRef<Log.Command> log) {
+
+        public StartSA (byte[] value, ActorRef<SAManager.Command> sam, ActorRef<Log.Command> log, ActorRef<Module.Command> module) {
             this.value = value;
             this.sam = sam;
             this.log = log;
+            this.module = module;
         }
 
     }
@@ -490,7 +493,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
             bb.put(s.value[i+2]);
             bb.put(s.value[i+3]);
             int channel = bb.getInt(0);
-            s.sam.tell(new SAManager.Start(sPi, channel, s.log));
+            s.sam.tell(new SAManager.Start(sPi, channel, s.log, s.module));
         }
 
         return this;

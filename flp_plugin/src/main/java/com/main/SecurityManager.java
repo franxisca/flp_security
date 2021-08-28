@@ -59,8 +59,8 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
             this.pdu = pdu;
         }
     }
-    public static Behavior<Command> create(ActorRef<Module.Command> parent) {
-        return Behaviors.setup(context -> new SecurityManager(context, parent));
+    public static Behavior<Command> create(ActorRef<Module.Command> parent, int activeKeys) {
+        return Behaviors.setup(context -> new SecurityManager(context, parent, activeKeys));
     }
 
     private final ActorRef<KeyManager.Command> keyMan;
@@ -68,14 +68,16 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
     private final ActorRef<SAManager.Command> saMan;
     private final ActorRef<Log.Command> log;
     private final ActorRef<Module.Command> parent;
+    private final int activeKeys;
 
-    private SecurityManager(ActorContext<Command> context, ActorRef<Module.Command> parent) {
+    private SecurityManager(ActorContext<Command> context, ActorRef<Module.Command> parent, int activeKeys) {
         super(context);
-        this.keyMan = getContext().spawn(KeyManager.create(), "keyMan");
+        this.keyMan = getContext().spawn(KeyManager.create(activeKeys), "keyMan");
         this.pduMan = getContext().spawn(PDUManager.create(), "pduMan");
         this.saMan = getContext().spawn(SAManager.create(), "saMan");
         this.log = getContext().spawn(Log.create(), "log");
         this.parent = parent;
+        this.activeKeys = activeKeys;
     }
 
     @Override
@@ -126,7 +128,7 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
             }
             //start SA
             case (byte) 0b00011011: {
-                this.pduMan.tell(new PDUManager.StartSA(value, this.saMan, this.log));
+                this.pduMan.tell(new PDUManager.StartSA(value, this.saMan, this.log, this.parent));
                 break;
             }
             //stop SA

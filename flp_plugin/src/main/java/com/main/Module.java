@@ -7,6 +7,10 @@ import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
 public class Module extends AbstractBehavior<Module.Command> {
 
     public interface Command {}
@@ -59,17 +63,38 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     }
 
-    public static Behavior<Command> create(ActorRef<PDUOutstream.Command> pduOut) {
-        return Behaviors.setup(context -> new Module(context, pduOut));
+    public static final class ReturnTM implements Command {
+        final byte[] tm;
+
+        public ReturnTM(byte[] tm) {
+            this.tm = tm;
+        }
+    }
+    public static final class MapVC implements Command {
+        final int channelId;
+        final ActorRef<SA.Command> saActor;
+
+        public MapVC(int channelId, ActorRef<SA.Command> saActor) {
+            this.channelId = channelId;
+            this.saActor = saActor;
+        }
+    }
+
+    public static Behavior<Command> create(ActorRef<PDUOutstream.Command> pduOut, int activeKeys) {
+        return Behaviors.setup(context -> new Module(context, pduOut, activeKeys));
     }
 
     private final ActorRef<SecurityManager.Command> secMan;
     private final ActorRef<PDUOutstream.Command> pduOut;
+    private final int activeKeys;
+    private final Map<Integer, ActorRef<SA.Command>> vcIdToSA= new HashMap<>();
+    private final Map<Integer, Short> vcIdToDefaultSA = new HashMap<>();
 
-    private Module(ActorContext<Command> context, ActorRef<PDUOutstream.Command> pduOut) {
+    private Module(ActorContext<Command> context, ActorRef<PDUOutstream.Command> pduOut, int activeKeys) {
         super(context);
-        this.secMan = getContext().spawn(SecurityManager.create(getContext().getSelf()), "secMan");
+        this.secMan = getContext().spawn(SecurityManager.create(getContext().getSelf(), activeKeys), "secMan");
         this.pduOut = pduOut;
+        this.activeKeys = activeKeys;
     }
 
     @Override
@@ -78,6 +103,7 @@ public class Module extends AbstractBehavior<Module.Command> {
                 .onMessage(PDUIn.class, this::onPDUIn)
                 .onMessage(PDUOut.class, this::onPDUout)
                 .onMessage(GetTCInfo.class, this::onTC)
+                .onMessage(MapVC.class, this::onMapVC)
                 .build();
     }
 
@@ -93,6 +119,11 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onTC(GetTCInfo tc) {
         this.secMan.tell(new SecurityManager.GetTCInfo(tc.sPi, tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent));
+        return this;
+    }
+
+    private Behavior<Command> onMapVC(MapVC m) {
+        this.vcIdToSA.put(m.channelId, m.saActor);
         return this;
     }
 }
