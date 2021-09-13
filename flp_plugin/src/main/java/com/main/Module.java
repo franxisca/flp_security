@@ -104,6 +104,7 @@ public class Module extends AbstractBehavior<Module.Command> {
     private final ActorRef<PDUOutstream.Command> pduOut;
     private final int activeKeys;
     private final Map<Integer, Short> vcIdToSA= new HashMap<>();
+    //TODO: needs to be configured
     private final Map<Integer, Short> vcIdToDefaultSA = new HashMap<>();
 
     private Module(ActorContext<Command> context, ActorRef<PDUOutstream.Command> pduOut, int activeKeys) {

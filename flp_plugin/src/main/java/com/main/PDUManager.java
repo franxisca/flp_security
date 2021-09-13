@@ -32,8 +32,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
           // this.replyTo = replyTo;
        }
     }
-    //TODO: upper bound for keys per module that can be active at the same time -> should be configurable
-    //TODO: configurable how? for now needs to be passed to Module actor on creation, does it need to be changed? hard bound? could be lost due to asynchronous communication
+    //TODO: get upper bound for active keys for configuration
 
     //SecurityManager needs to pass reference to KeyManager when issuing otar to PDUManager
     //should work
@@ -76,18 +75,18 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         }
     }
 
-    //TODO, ask in meeting
-    //TODO: must be answered for all keys to be verified in a single reply PDU
-    //wtf do i get here exactly, needs to be replied to
+    //should work
     public static final class KeyVerification implements Command{
         final byte[] value;
         final ActorRef<KeyManager.Command> replyTo;
         final ActorRef<Log.Command> log;
+        final ActorRef<SecurityManager.Command> secMan;
 
-        public KeyVerification (byte[] value, ActorRef<KeyManager.Command> replyTo, ActorRef<Log.Command> log) {
+        public KeyVerification (byte[] value, ActorRef<KeyManager.Command> replyTo, ActorRef<Log.Command> log, ActorRef<SecurityManager.Command> secMan) {
             this.value = value;
             this.replyTo = replyTo;
             this.log = log;
+            this.secMan = secMan;
         }
     }
 
@@ -108,7 +107,6 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //TODO: store SAs for VCs
     //value contains only one SPI but might contain multiple GVC/GMAP ids to add to SA, how is a channel not applicable to SA?
     //ignoring that maybe not applicable
     //channel ids have 32 bit (size of int)
@@ -292,9 +290,15 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //TODO, ask in meeting because no idea what keyActor verification does
-    public static final class KeyVerificationReply implements Command {
 
+    public static final class KeyVerificationReply implements Command {
+        final Map<Byte, byte[]> reply;
+        final ActorRef<SecurityManager.Command> replyTo;
+
+        public KeyVerificationReply(Map<Byte, byte[]> reply, ActorRef<SecurityManager.Command> replyTo) {
+            this.reply = reply;
+            this.replyTo = replyTo;
+        }
     }
 
     //should work
@@ -404,6 +408,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
                 .onMessage(SAStatusRequestReply.class, this::onStatusReply)
                 .onMessage(ReadARSN.class, this::onReadARSN)
                 .onMessage(ReadARSNWindow.class, this::onReadARSNWindow)
+                .onMessage(ReadARSNWindowReply.class, this::onReadARSNWindowReply)
                 .onMessage(ReadARSNReply.class, this::onReadARSNReply)
                 .onMessage(Ping.class, this::onPing)
                 .onMessage(KeyInventory.class, this::onInventory)
@@ -413,6 +418,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
                 .onMessage(DumpLogReply.class, this::onDumpLogReply)
                 .onMessage(EraseLogReply.class, this::onEraseLogReply)
                 .onMessage(KeyDestruction.class, this::onDestruction)
+                .onMessage(KeyVerificationReply.class, this::onVerifyReply)
                 .build();
     }
 
@@ -430,7 +436,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         return this;
     }*/
 
-    //should work, TODO: check decryption
+    //should work
     private Behavior<Command> onOtar(Otar o) {
         byte masterKey = o.value[0];
         byte[] iv = new byte[12];
@@ -612,7 +618,6 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         return this;
     }
 
-    //TODO: arcWindow length
     private Behavior<Command> onReadARSNWindowReply(ReadARSNWindowReply r) {
         byte tag = (byte) 0b11010000;
         short length = 10;
@@ -659,7 +664,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
             //k.replyTo.tell(new KeyManager.VerifyKey(keyId, challenge, k.log, getContext().getSelf()));
         }
 
-        k.replyTo.tell(new KeyManager.VerifyKey(keyToChallenge, k.log, getContext().getSelf(), reply));
+        k.replyTo.tell(new KeyManager.VerifyKey(keyToChallenge, k.log, getContext().getSelf(), reply, k.secMan));
         return this;
     }
 
@@ -672,8 +677,8 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         value[1] = (byte) ((k.number >> 8) & 0xff);
         int j = 0;
         Iterator it = k.keyIdToState.entrySet().iterator();
-        //TODO: think about sense of the for-loop
-        for (int i = 2; i < (2 * k.keyIdToState.size()) && it.hasNext(); i = i+2)
+        //if something doesn't work check condition in for loop
+        for (int i = 2; i < (2 * k.keyIdToState.size() + 2) && it.hasNext(); i = i+2)
         {
             Map.Entry<Byte, KeyState> pair = (Map.Entry) it.next();
             value[i] = pair.getKey();
@@ -718,6 +723,28 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
             byte keyId = k.value[i];
             k.keyMan.tell(new KeyManager.KeyDestruction(keyId, k.log));
         }
+        return this;
+    }
+
+    private Behavior<Command> onVerifyReply(KeyVerificationReply k) {
+        byte tag = (byte) 0b10000100;
+        short length = 0;
+        for(Map.Entry<Byte, byte[]> entry : k.reply.entrySet()) {
+            length++;
+            length = (short) (length + entry.getValue().length);
+        }
+        ArrayList<Byte> temp = new ArrayList<>();
+        byte[] value = new byte[length];
+        for(Map.Entry<Byte, byte[]> entry : k.reply.entrySet()) {
+            temp.add(entry.getKey());
+            for(int i = 0; i < entry.getValue().length; i++) {
+                temp.add(entry.getValue()[i]);
+            }
+        }
+        for(int j = 0; j < length; j++) {
+            value[j] = temp.get(j);
+        }
+        k.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
         return this;
     }
 }

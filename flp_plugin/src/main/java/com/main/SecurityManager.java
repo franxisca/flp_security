@@ -137,7 +137,7 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
             }
             //keyActor verification
             case (byte) 0b00000100: {
-                this.pduMan.tell(new PDUManager.KeyVerification(value, this.keyMan, this.log));
+                this.pduMan.tell(new PDUManager.KeyVerification(value, this.keyMan, this.log, getContext().getSelf()));
                 break;
             }
             //keyActor inventory

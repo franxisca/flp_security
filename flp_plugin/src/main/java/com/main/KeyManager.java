@@ -95,12 +95,14 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         final ActorRef<Log.Command> log;
         final ActorRef<PDUManager.Command> replyTo;
         Map<Byte, byte[]> reply;
+        final ActorRef<SecurityManager.Command> secMan;
 
-        public VerifyKey(ArrayList<Pair<Byte, byte[]>> keyToChallenge, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> replyTo, Map<Byte, byte[]> reply) {
+        public VerifyKey(ArrayList<Pair<Byte, byte[]>> keyToChallenge, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> replyTo, Map<Byte, byte[]> reply, ActorRef<SecurityManager.Command> secMan) {
             this.keyToChallenge = keyToChallenge;
             this.log = log;
             this.replyTo = replyTo;
             this.reply = reply;
+            this.secMan = secMan;
         }
     }
 
@@ -251,6 +253,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
     public Receive<Command> createReceive() {
         return newReceiveBuilder()
                 .onMessage(OTAR.class, this::onOtar)
+                .onMessage(DecOtar.class, this::onDecOtar)
                 .onMessage(ActivateKey.class, this::onActivate)
                 .onMessage(ActivateReply.class, this::onActivateReply)
                 .onMessage(DeactivateKey.class, this::onDeactivate)
@@ -296,11 +299,13 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         ActorRef<Key.Command> master = this.keyIdToActor.get(o.masterKey);
         //masterKey does not exist
         if(master == null) {
-            //TODO:log
+            byte tag = (byte) 0b00110001;
+            short length = 1;
+            byte[] value = new byte[1];
+            value[0] = o.masterKey;
+            o.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
-
-            //TODO: how to handle otar, maybe don't store keys as actors thus it can be handled in KeyManager?
             master.tell(new Key.GetMaster(o.keys, o.mac, o.iv, o.log, getContext().getSelf()));
         }
         return this;
@@ -308,18 +313,10 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
     private Behavior<Command> onDecOtar(DecOtar d) {
 
-        byte[] plain;
-        try {
-            plain = decrypt(d.keys, d.masterKey, d.iv, d.mac);
-        }
-        //TODO: is this an error in decryption? I suppose so
-        //TODO: log
-        catch (Exception e) {
-            plain = new byte[0];
-        }
         //decryption worked
         //TODO: assumes decryption returns plain text only
-        if(plain.length != 0) {
+        try {
+            byte[] plain = decrypt(d.keys, d.masterKey, d.iv, d.mac);
             for(int i = 0; i < plain.length; i++) {
                 byte keyId = plain[i];
                 i++;
@@ -349,6 +346,15 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
                 }
             }
         }
+        //error in key decryption
+        catch (Exception e) {
+            byte tag = (byte) 0b00010001;
+            short length  = 1;
+            byte[] value  = new byte[1];
+            value[0] = d.masterId;
+            d.log.tell(new Log.InsertEntry(tag, length, value));
+        }
+
         return this;
     }
 
@@ -484,19 +490,23 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
     private Behavior<Command> onVerify(VerifyKey v) {
         //no keys left to verify
         if(v.keyToChallenge.isEmpty()) {
-            //TODO
+            v.replyTo.tell(new PDUManager.KeyVerificationReply(v.reply, v.secMan));
         }
         //verify next key
         else {
             Pair<Byte, byte[]> pair = v.keyToChallenge.get(0);
             ActorRef<Key.Command> keyActor = this.keyIdToActor.get(pair.first());
+            v.keyToChallenge.remove(0);
             //key to verify not found, don't continue, log error
-            //TODO: ask if others shall be verified
             if(keyActor == null) {
-                //TODO
+                byte tag = (byte) 0b00000100;
+                short length = 1;
+                byte[] value = new byte[1];
+                value[0] = pair.first();
+                v.log.tell(new Log.InsertEntry(tag, length, value));
             }
             else {
-                keyActor.tell(new Key.Verify(pair.second(), v.log, v.replyTo, v.keyToChallenge, v.reply, getContext().getSelf()));
+                keyActor.tell(new Key.Verify(pair.second(), v.log, v.replyTo, v.keyToChallenge, v.reply, getContext().getSelf(), v.secMan));
             }
         }
         return this;
@@ -527,7 +537,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         ActorRef<Key.Command> keyActor = this.keyIdToActor.get(tc.keyId);
         //keyActor does not exist
         if(keyActor == null) {
-            //TODO
+            //TODO -> FSR
         }
         else {
             keyActor.tell(new Key.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, tc.arc, tc.authMask));
@@ -537,9 +547,9 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
     private Behavior<Command> onTM(GetTMInfo tm) {
         ActorRef<Key.Command> keyActor = this.keyIdToActor.get(tm.keyId);
-        //keyActor does not exist
+        //keyActor does not exist, should not happen
         if(keyActor == null) {
-            //TODO
+            getContext().getLog().info("key for TM encryption does not exist");
         }
         else {
             keyActor.tell(new Key.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.sPi, tm.arc, tm.iv, tm.authMask, tm.tmProc));

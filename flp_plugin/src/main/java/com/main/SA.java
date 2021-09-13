@@ -391,7 +391,7 @@ public class SA extends AbstractBehavior<SA.Command> {
 
     private Behavior<Command> onReadARSNWindow(ReadARSNWindow r) {
         byte tag = (byte) 0b11010000;
-        short length = 10;
+        short length = 6;
         byte[] value = new byte[10];
         value[0] = (byte) (this.sPi & 0xff);
         value[1] = (byte) ((this.sPi >> 8) & 0xff);
@@ -429,7 +429,6 @@ public class SA extends AbstractBehavior<SA.Command> {
         return this;
     }
 
-    //TODO: do not deactivate keys still used by SAs, but why not double check if keyActor is active
     private Behavior<Command> onTC(GetTCInfo tc) {
         //SA not in the right state
         if(this.state != SAState.OPERATIONAL) {
@@ -444,7 +443,7 @@ public class SA extends AbstractBehavior<SA.Command> {
                 bits.set(i);
             }
         }
-        //TODO: that's ugly but chan is a one byte array
+        //chan is a one byte array
         chan = bits.toByteArray();
         byte[] channel = new byte[4];
         channel[0] = 0;
@@ -458,7 +457,6 @@ public class SA extends AbstractBehavior<SA.Command> {
         else {
             tc.keyMan.tell(new KeyManager.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, this.keyId, this.aRC, this.authBitMask));
         }
-        //TODO: get keyActor, need keyManager reference for that :(
         return this;
     }
 

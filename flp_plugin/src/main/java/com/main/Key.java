@@ -80,7 +80,6 @@ public class Key extends AbstractBehavior<Key.Command> {
 
     public static final class NotUsed implements Command {}
 
-    //TODO: act on reception of this message, aka encrypt and MAC challenge and send reply
     public static final class Verify implements Command {
         final byte[] challenge;
         final ActorRef<Log.Command> log;
@@ -88,14 +87,16 @@ public class Key extends AbstractBehavior<Key.Command> {
         final ArrayList<Pair<Byte, byte[]>> keyToChallenge;
         final Map<Byte, byte[]> reply;
         final ActorRef<KeyManager.Command> keyMan;
+        final ActorRef<SecurityManager.Command> secMan;
 
-        public Verify(byte[] challenge, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> replyTo, ArrayList<Pair<Byte, byte[]>> keyToChallenge, Map<Byte, byte[]> reply, ActorRef<KeyManager.Command> keyMan) {
+        public Verify(byte[] challenge, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> replyTo, ArrayList<Pair<Byte, byte[]>> keyToChallenge, Map<Byte, byte[]> reply, ActorRef<KeyManager.Command> keyMan, ActorRef<SecurityManager.Command> secMan) {
             this.challenge = challenge;
             this.log = log;
             this.replyTo = replyTo;
             this.keyToChallenge = keyToChallenge;
             this.reply = reply;
             this.keyMan = keyMan;
+            this.secMan = secMan;
         }
     }
 
@@ -313,7 +314,7 @@ public class Key extends AbstractBehavior<Key.Command> {
     private Behavior<Command> onTC(GetTCInfo tc) {
         //keyActor is not ACTIVE, should not happen
         if(this.keyState != KeyState.ACTIVE) {
-            //TODO
+            //TODO -> FSR
         }
         //return keyActor to TCProcessor
         else {
@@ -341,11 +342,12 @@ public class Key extends AbstractBehavior<Key.Command> {
             reply[1] = 0;
             System.arraycopy(response, 0, reply, 2, response.length);
             v.reply.put(this.keyId, reply);
-            v.keyMan.tell(new KeyManager.VerifyKey(v.keyToChallenge, v.log, v.replyTo, v.reply));
+            v.keyMan.tell(new KeyManager.VerifyKey(v.keyToChallenge, v.log, v.replyTo, v.reply, v.secMan));
         }
         catch (Exception e) {
 
-            //TODO
+            //encryption did not work, should not happen
+            getContext().getLog().info("key verification encryption failed");
         }
         return this;
     }
@@ -354,10 +356,12 @@ public class Key extends AbstractBehavior<Key.Command> {
     private static byte[] encrypt(byte[] challenge, byte[] key) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         SecretKey secretKey = new SecretKeySpec(key, "AES");
-        byte[] iv = new byte[16];
-        for(int i = 0; i < 16; i++) {
+        byte[] iv = new byte[2];
+        /*for(int i = 0; i < 2; i++) {
             iv[i] = 0;
-        }
+        }*/
+        /*iv[0] = 0;
+        iv[1] = 0;*/
         GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmParameterSpec);
         return cipher.doFinal(challenge);
