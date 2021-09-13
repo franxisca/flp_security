@@ -3,11 +3,13 @@ package com.main;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
 import akka.actor.typed.javadsl.*;
+import akka.japi.Pair;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -72,7 +74,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         }
     }
 
-    public static final class VerifyKey implements Command{
+    /*public static final class VerifyKey implements Command{
         final byte keyId;
         final byte[] challenge;
         final ActorRef<Log.Command> log;
@@ -85,6 +87,21 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             this.replyTo = replyTo;
         }
 
+    }*/
+
+    public static final class VerifyKey implements Command {
+        ArrayList<Pair<Byte, byte[]>> keyToChallenge;
+        //Map<Byte, byte[]> keyToChallenge;
+        final ActorRef<Log.Command> log;
+        final ActorRef<PDUManager.Command> replyTo;
+        Map<Byte, byte[]> reply;
+
+        public VerifyKey(ArrayList<Pair<Byte, byte[]>> keyToChallenge, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> replyTo, Map<Byte, byte[]> reply) {
+            this.keyToChallenge = keyToChallenge;
+            this.log = log;
+            this.replyTo = replyTo;
+            this.reply = reply;
+        }
     }
 
     public static final class OTAR implements Command{
@@ -186,6 +203,32 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         }
     }
 
+    public static final class GetTMInfo implements Command {
+
+        final byte[] frameHeader;
+        final byte[] data;
+        final byte[] trailer;
+        final int channel;
+        final short sPi;
+        final byte[] arc;
+        final byte[] iv;
+        final byte[] authMask;
+        final byte keyId;
+        final ActorRef<TMProcessor.Command> tmProc;
+        public GetTMInfo(byte[] frameHeader, byte[] data, byte[] trailer, int channel, short sPi, byte[] arc, byte[] iv, byte[] authMask, byte keyId, ActorRef<TMProcessor.Command> tmProc) {
+            this.frameHeader = frameHeader;
+            this.data = data;
+            this.trailer = trailer;
+            this.channel = channel;
+            this.sPi = sPi;
+            this.arc = arc;
+            this.iv = iv;
+            this.authMask = authMask;
+            this.keyId = keyId;
+            this.tmProc = tmProc;
+        }
+    }
+
     public static final class KeyRequested implements Command {
 
     }
@@ -217,6 +260,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
                 .onMessage(KeyInventory.class, this::onInventory)
                 .onMessage(KeyDestruction.class, this::onDestruction)
                 .onMessage(GetTCInfo.class, this::onTC)
+                .onMessage(GetTMInfo.class, this::onTM)
                 .build();
     }
 
@@ -339,13 +383,15 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             a.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
-            keyActor.tell(new Key.Activate(a.log));
+            currentlyActive++;
+            keyActor.tell(new Key.Activate(a.log, getContext().getSelf()));
         }
         return this;
     }
 
+    //key was not activated as it was in the wrong state before
     private Behavior<Command> onActivateReply(ActivateReply a) {
-        this.currentlyActive++;
+        this.currentlyActive--;
         return this;
     }
 
@@ -365,21 +411,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         return this;
     }
 
-    private Behavior<Command> onVerify(VerifyKey v) {
-        ActorRef<Key.Command> keyActor = this.keyIdToActor.get(v.keyId);
-        //keyActor does not exist
-        if(keyActor == null) {
-            byte tag = (byte) 0b00000100;
-            short length = 1;
-            byte[] value = new byte[1];
-            value[0] = v.keyId;
-            v.log.tell(new Log.InsertEntry(tag, length , value));
-        }
-        else {
-            keyActor.tell(new Key.Verify(v.challenge, v.log, v.replyTo));
-        }
-        return this;
-    }
+
 
     private Behavior<Command> onRekey(Rekey r) {
         ActorRef<Key.Command> keyActor = keyIdToActor.get(r.keyId);
@@ -433,6 +465,43 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         return this;
     }
 
+    /*private Behavior<Command> onVerify(VerifyKey v) {
+        ActorRef<Key.Command> keyActor = this.keyIdToActor.get(v.keyId);
+        //keyActor does not exist
+        if(keyActor == null) {
+            byte tag = (byte) 0b00000100;
+            short length = 1;
+            byte[] value = new byte[1];
+            value[0] = v.keyId;
+            v.log.tell(new Log.InsertEntry(tag, length , value));
+        }
+        else {
+            keyActor.tell(new Key.Verify(v.challenge, v.log, v.replyTo));
+        }
+        return this;
+    }*/
+
+    private Behavior<Command> onVerify(VerifyKey v) {
+        //no keys left to verify
+        if(v.keyToChallenge.isEmpty()) {
+            //TODO
+        }
+        //verify next key
+        else {
+            Pair<Byte, byte[]> pair = v.keyToChallenge.get(0);
+            ActorRef<Key.Command> keyActor = this.keyIdToActor.get(pair.first());
+            //key to verify not found, don't continue, log error
+            //TODO: ask if others shall be verified
+            if(keyActor == null) {
+                //TODO
+            }
+            else {
+                keyActor.tell(new Key.Verify(pair.second(), v.log, v.replyTo, v.keyToChallenge, v.reply, getContext().getSelf()));
+            }
+        }
+        return this;
+    }
+
     private Behavior<Command> onDestruction(KeyDestruction k) {
         ActorRef<Key.Command> keyActor = this.keyIdToActor.get(k.keyId);
         //keyActor to erase does not exist
@@ -466,4 +535,15 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         return this;
     }
 
+    private Behavior<Command> onTM(GetTMInfo tm) {
+        ActorRef<Key.Command> keyActor = this.keyIdToActor.get(tm.keyId);
+        //keyActor does not exist
+        if(keyActor == null) {
+            //TODO
+        }
+        else {
+            keyActor.tell(new Key.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.sPi, tm.arc, tm.iv, tm.authMask, tm.tmProc));
+        }
+        return this;
+    }
 }

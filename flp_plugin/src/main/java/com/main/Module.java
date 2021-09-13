@@ -72,11 +72,27 @@ public class Module extends AbstractBehavior<Module.Command> {
     }
     public static final class MapVC implements Command {
         final int channelId;
-        final ActorRef<SA.Command> saActor;
+        final short sPi;
 
-        public MapVC(int channelId, ActorRef<SA.Command> saActor) {
+        public MapVC(int channelId, short sPi) {
             this.channelId = channelId;
-            this.saActor = saActor;
+            this.sPi = sPi;
+        }
+    }
+
+    public static final class GetTMInfo implements Command {
+        final byte[] frameHeader;
+        final byte[] data;
+        final byte[] trailer;
+        final int channel;
+        final ActorRef<TMProcessor.Command> tmProc;
+
+        public GetTMInfo(byte[] frameHeader, byte[] data, byte[] trailer, int channel, ActorRef<TMProcessor.Command> tmProc) {
+            this.frameHeader = frameHeader;
+            this.data = data;
+            this.trailer = trailer;
+            this.channel = channel;
+            this.tmProc = tmProc;
         }
     }
 
@@ -87,7 +103,7 @@ public class Module extends AbstractBehavior<Module.Command> {
     private final ActorRef<SecurityManager.Command> secMan;
     private final ActorRef<PDUOutstream.Command> pduOut;
     private final int activeKeys;
-    private final Map<Integer, ActorRef<SA.Command>> vcIdToSA= new HashMap<>();
+    private final Map<Integer, Short> vcIdToSA= new HashMap<>();
     private final Map<Integer, Short> vcIdToDefaultSA = new HashMap<>();
 
     private Module(ActorContext<Command> context, ActorRef<PDUOutstream.Command> pduOut, int activeKeys) {
@@ -104,6 +120,7 @@ public class Module extends AbstractBehavior<Module.Command> {
                 .onMessage(PDUOut.class, this::onPDUout)
                 .onMessage(GetTCInfo.class, this::onTC)
                 .onMessage(MapVC.class, this::onMapVC)
+                .onMessage(GetTMInfo.class, this::onTM)
                 .build();
     }
 
@@ -123,7 +140,20 @@ public class Module extends AbstractBehavior<Module.Command> {
     }
 
     private Behavior<Command> onMapVC(MapVC m) {
-        this.vcIdToSA.put(m.channelId, m.saActor);
+        this.vcIdToSA.put(m.channelId, m.sPi);
+        return this;
+    }
+
+    private Behavior<Command> onTM (GetTMInfo tm) {
+        short sPi = this.vcIdToSA.get(tm.channel);
+        //no SA active on this channel, use default SA
+        if(!this.vcIdToSA.containsKey(tm.channel)) {
+            //TODO
+        }
+        else {
+            this.secMan.tell(new SecurityManager.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc, sPi));
+            //saActor.tell(new SA.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc));
+        }
         return this;
     }
 }

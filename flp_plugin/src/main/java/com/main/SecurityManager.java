@@ -40,6 +40,24 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
         }
     }
 
+    public static final class GetTMInfo implements Command
+    {
+        final byte[] frameHeader;
+        final byte[] data;
+        final byte[] trailer;
+        final int channel;
+        final ActorRef<TMProcessor.Command> tmProc;
+        final short sPi;
+
+        public GetTMInfo(byte[] frameHeader, byte[] data, byte[] trailer, int channel, ActorRef<TMProcessor.Command> tmProc, short sPi) {
+            this.frameHeader = frameHeader;
+            this.data = data;
+            this.trailer = trailer;
+            this.channel = channel;
+            this.tmProc = tmProc;
+            this.sPi = sPi;
+        }
+    }
     public static final class PDUReply implements Command {
         final byte tag;
         final short length;
@@ -86,6 +104,7 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
                 .onMessage(PDU.class, this::onPDU)
                 .onMessage(PDUReply.class, this::onPDUReply)
                 .onMessage(GetTCInfo.class, this::onTC)
+                .onMessage(GetTMInfo.class, this::onTM)
                 .build();
     }
 
@@ -211,6 +230,11 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
 
     private Behavior<Command> onTC(GetTCInfo tc) {
         this.saMan.tell(new SAManager.GetTCInfo(tc.sPi, tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, this.keyMan));
+        return this;
+    }
+
+    private Behavior<Command> onTM(GetTMInfo tm) {
+        this.saMan.tell(new SAManager.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc, tm.sPi, this.keyMan));
         return this;
     }
 }

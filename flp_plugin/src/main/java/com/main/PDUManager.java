@@ -6,8 +6,10 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 import akka.actor.typed.javadsl.ActorContext;
+import akka.japi.Pair;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -75,6 +77,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     //TODO, ask in meeting
+    //TODO: must be answered for all keys to be verified in a single reply PDU
     //wtf do i get here exactly, needs to be replied to
     public static final class KeyVerification implements Command{
         final byte[] value;
@@ -310,11 +313,11 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     //should work
     public static final class SAStatusRequestReply implements Command {
-        final SAState[] trans;
+        final byte trans;
         final short sPi;
         final ActorRef<SecurityManager.Command> replyTo;
 
-        public SAStatusRequestReply(short sPi, SAState[] trans, ActorRef<SecurityManager.Command> replyTo) {
+        public SAStatusRequestReply(short sPi, byte trans, ActorRef<SecurityManager.Command> replyTo) {
             this.trans = trans;
             this.sPi = sPi;
             this.replyTo = replyTo;
@@ -336,10 +339,10 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     public static final class ReadARSNWindowReply implements Command {
         final short sPi;
-        final long arcWindow;
+        final int arcWindow;
         final ActorRef<SecurityManager.Command> replyTo;
 
-        public ReadARSNWindowReply(short sPi, long arcWindow, ActorRef<SecurityManager.Command> replyTo) {
+        public ReadARSNWindowReply(short sPi, int arcWindow, ActorRef<SecurityManager.Command> replyTo) {
             this.sPi = sPi;
             this.arcWindow = arcWindow;
             this.replyTo = replyTo;
@@ -467,19 +470,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         return this;
     }
 
-    private Behavior<Command> onVerification(KeyVerification k) {
-        byte[] challenge = new byte[32];
-        for(int i = 0; i < k.value.length; i++) {
-            byte keyId = k.value[i];
-            i++;
-            for (int j = 0; j < 32; j++) {
-                challenge[j] = k.value[i];
-                i++;
-            }
-            k.replyTo.tell(new KeyManager.VerifyKey(keyId, challenge, k.log, getContext().getSelf()));
-        }
-        return this;
-    }
+
 
     private Behavior<Command> onStartSA(StartSA s) {
         ByteBuffer bb2 = ByteBuffer.allocate(2);
@@ -560,12 +551,12 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         bb.put(s.value[0]);
         bb.put(s.value[1]);
         short sPi = bb.getShort(0);
-        //how long is ARSNWindow? now:long
-        ByteBuffer bb2 = ByteBuffer.allocate(8);
-        for(int i = 0; i < 8; i++) {
+        //how long is ARSNWindow? now:int
+        ByteBuffer bb2 = ByteBuffer.allocate(4);
+        for(int i = 0; i < 4; i++) {
             bb2.put(s.value[i+2]);
         }
-        long arcWindow = bb2.getLong(0);
+        int arcWindow = bb2.getInt(0);
         s.sam.tell(new SAManager.SetARSNWindow(sPi, arcWindow, s.log));
         return this;
     }
@@ -586,6 +577,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         byte[] value = new byte[3];
         value[0] = (byte) (s.sPi & 0xff);
         value[1] = (byte) ((s.sPi >> 8) & 0xff);
+        value[2] = s.trans;
         s.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
         return this;
     }
@@ -624,12 +616,12 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     private Behavior<Command> onReadARSNWindowReply(ReadARSNWindowReply r) {
         byte tag = (byte) 0b11010000;
         short length = 10;
-        //2 byte sPi, 8 byte arcWindow
+        //2 byte sPi, 4 byte arcWindow
         byte[] value = new byte[10];
         value[0] = (byte) (r.sPi & 0xff);
         value[1] = (byte) ((r.sPi >> 8) & 0xff);
-        byte[] bytes = ByteBuffer.allocate(8).putLong(r.arcWindow).array();
-        System.arraycopy(bytes, 0, value, 2, 8);
+        byte[] bytes = ByteBuffer.allocate(4).putInt(r.arcWindow).array();
+        System.arraycopy(bytes, 0, value, 2, 4);
         r.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
         return this;
     }
@@ -649,6 +641,28 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         return this;
     }
 
+    //assumes challenge is 2 bytes long
+    private Behavior<Command> onVerification(KeyVerification k) {
+        Map<Byte, byte[]> reply = new HashMap<>();
+        //Map<Byte, byte[]> keyToChallenge = new HashMap<>();
+        ArrayList<Pair<Byte, byte[]>> keyToChallenge = new ArrayList<>();
+        byte[] challenge = new byte[2];
+        for(int i = 0; i < k.value.length; i++) {
+            byte keyId = k.value[i];
+            i++;
+            for (int j = 0; j < 2; j++) {
+                challenge[j] = k.value[i];
+                i++;
+            }
+            //keyToChallenge.put(keyId, challenge);
+            keyToChallenge.add(new Pair<>(keyId, challenge));
+            //k.replyTo.tell(new KeyManager.VerifyKey(keyId, challenge, k.log, getContext().getSelf()));
+        }
+
+        k.replyTo.tell(new KeyManager.VerifyKey(keyToChallenge, k.log, getContext().getSelf(), reply));
+        return this;
+    }
+
     private Behavior<Command> onInventoryReply(KeyInventoryReply k) {
         byte tag = (byte) 0b10000111;
         //length is size of map times 1 (for keyId) + (number of bytes required for keyState (here assuming 1) + 2(for number of keys field)
@@ -663,7 +677,6 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         {
             Map.Entry<Byte, KeyState> pair = (Map.Entry) it.next();
             value[i] = pair.getKey();
-            //TODO: encode keyState as byte
             value[i+1] = pair.getValue().toByte();
         }
         k.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));

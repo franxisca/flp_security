@@ -6,7 +6,13 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
+import akka.japi.Pair;
 
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.ArrayList;
 import java.util.Map;
 
 public class Key extends AbstractBehavior<Key.Command> {
@@ -48,9 +54,11 @@ public class Key extends AbstractBehavior<Key.Command> {
     public static final class Activate implements Command {
 
         final ActorRef<Log.Command> log;
+        final ActorRef<KeyManager.Command> parent;
 
-        public Activate(ActorRef<Log.Command> log) {
+        public Activate(ActorRef<Log.Command> log, ActorRef<KeyManager.Command> parent) {
             this.log = log;
+            this.parent = parent;
         }
     }
 
@@ -77,11 +85,17 @@ public class Key extends AbstractBehavior<Key.Command> {
         final byte[] challenge;
         final ActorRef<Log.Command> log;
         final ActorRef<PDUManager.Command> replyTo;
+        final ArrayList<Pair<Byte, byte[]>> keyToChallenge;
+        final Map<Byte, byte[]> reply;
+        final ActorRef<KeyManager.Command> keyMan;
 
-        public Verify(byte[] challenge, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> replyTo) {
+        public Verify(byte[] challenge, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> replyTo, ArrayList<Pair<Byte, byte[]>> keyToChallenge, Map<Byte, byte[]> reply, ActorRef<KeyManager.Command> keyMan) {
             this.challenge = challenge;
             this.log = log;
             this.replyTo = replyTo;
+            this.keyToChallenge = keyToChallenge;
+            this.reply = reply;
+            this.keyMan = keyMan;
         }
     }
 
@@ -162,6 +176,31 @@ public class Key extends AbstractBehavior<Key.Command> {
         }
     }
 
+    public static final class GetTMInfo implements Command {
+
+        final byte[] frameHeader;
+        final byte[] data;
+        final byte[] trailer;
+        final int channel;
+        final short sPi;
+        final byte[] arc;
+        final byte[] iv;
+        final byte[] authMask;
+        final ActorRef<TMProcessor.Command> tmProc;
+
+        public GetTMInfo(byte[] frameHeader, byte[] data, byte[] trailer, int channel,short sPi, byte[] arc, byte[] iv, byte[] authMask, ActorRef<TMProcessor.Command> tmProc) {
+            this.frameHeader = frameHeader;
+            this.data = data;
+            this.trailer = trailer;
+            this.channel = channel;
+            this.sPi = sPi;
+            this.arc = arc;
+            this.iv = iv;
+            this.authMask = authMask;
+            this.tmProc = tmProc;
+        }
+    }
+
     public static Behavior<Command> create(byte keyId, byte[] key, boolean startUp) {
         return Behaviors.setup(context -> new Key(context, keyId, key, startUp));
     }
@@ -193,6 +232,8 @@ public class Key extends AbstractBehavior<Key.Command> {
                 .onMessage(GetTCInfo.class, this::onTC)
                 .onMessage(Used.class, this::onUsed)
                 .onMessage(NotUsed.class, this::onNotUsed)
+                .onMessage(Verify.class, this::onVerify)
+                .onMessage(GetTMInfo.class, this::onTM)
                 .build();
     }
 
@@ -209,6 +250,7 @@ public class Key extends AbstractBehavior<Key.Command> {
         if(this.keyState != KeyState.PRE_ACTIVE) {
             byte tag = (byte) 0b00110010;
             a.log.tell(new Log.InsertEntry(tag, length, value));
+            a.parent.tell(new KeyManager.ActivateReply());
         }
         else {
             byte tag = (byte) 0b10000010;
@@ -289,4 +331,41 @@ public class Key extends AbstractBehavior<Key.Command> {
         this.inUse = false;
         return this;
     }
+
+    private Behavior<Command> onVerify (Verify v) {
+        byte[] response;
+        try {
+            response = encrypt(v.challenge, this.key);
+            byte[] reply = new byte[response.length + 2];
+            reply[0] = 0;
+            reply[1] = 0;
+            System.arraycopy(response, 0, reply, 2, response.length);
+            v.reply.put(this.keyId, reply);
+            v.keyMan.tell(new KeyManager.VerifyKey(v.keyToChallenge, v.log, v.replyTo, v.reply));
+        }
+        catch (Exception e) {
+
+            //TODO
+        }
+        return this;
+    }
+
+    //TODO: check if it works
+    private static byte[] encrypt(byte[] challenge, byte[] key) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        SecretKey secretKey = new SecretKeySpec(key, "AES");
+        byte[] iv = new byte[16];
+        for(int i = 0; i < 16; i++) {
+            iv[i] = 0;
+        }
+        GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmParameterSpec);
+        return cipher.doFinal(challenge);
+    }
+
+    private Behavior<Command> onTM (GetTMInfo tm) {
+        tm.tmProc.tell(new TMProcessor.TMInfo(tm.frameHeader, tm.data, tm.trailer, tm.sPi, tm.arc, tm.iv, this.key, tm.authMask));
+        return this;
+    }
+
 }

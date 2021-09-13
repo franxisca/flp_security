@@ -44,6 +44,26 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         }
     }
 
+    public static final class GetTMInfo implements Command {
+        final byte[] frameHeader;
+        final byte[] data;
+        final byte[] trailer;
+        final int channel;
+        final ActorRef<TMProcessor.Command> tmProc;
+        final short sPi;
+        final ActorRef<KeyManager.Command> keyMan;
+
+        public GetTMInfo(byte[] frameHeader, byte[] data, byte[] trailer, int channel, ActorRef<TMProcessor.Command> tmProc, short sPi, ActorRef<KeyManager.Command> keyMan) {
+            this.frameHeader = frameHeader;
+            this.data = data;
+            this.trailer = trailer;
+            this.channel = channel;
+            this.tmProc = tmProc;
+            this.sPi = sPi;
+            this.keyMan = keyMan;
+        }
+    }
+
     public static final class Verify implements Command {
 
     }
@@ -52,13 +72,13 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         final short sPi;
         final ActorRef<Log.Command> log;
         final ActorRef<PDUManager.Command> pum;
-        final ActorRef<SecurityManager.Command> replyTo;
+        final ActorRef<SecurityManager.Command> secMan;
 
-        public StatusRequest(short sPi, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> pum, ActorRef<SecurityManager.Command> replyTo) {
+        public StatusRequest(short sPi, ActorRef<Log.Command> log, ActorRef<PDUManager.Command> pum, ActorRef<SecurityManager.Command> secMan) {
             this.sPi = sPi;
             this.log = log;
             this.pum = pum;
-            this.replyTo = replyTo;
+            this.secMan = secMan;
         }
 
     }
@@ -137,10 +157,10 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
 
     public static final class SetARSNWindow implements Command {
         final short sPi;
-        final long arcWindow;
+        final int arcWindow;
         final ActorRef<Log.Command> log;
 
-        public SetARSNWindow(short sPi, long arcWindow, ActorRef<Log.Command> log) {
+        public SetARSNWindow(short sPi, int arcWindow, ActorRef<Log.Command> log) {
             this.sPi = sPi;
             this.arcWindow = arcWindow;
             this.log = log;
@@ -197,6 +217,7 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
                 .onMessage(ReadARSN.class, this::onReadARSN)
                 .onMessage(ReadARSNWindow.class, this::onReadARSNWindow)
                 .onMessage(GetTCInfo.class, this::onTC)
+                .onMessage(GetTMInfo.class, this::onTM)
                 .build();
     }
 
@@ -279,8 +300,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             byte[] value = new byte[10];
             value[0] = (byte) (s.sPi & 0xff);
             value[1] = (byte) ((s.sPi >> 8) & 0xff);
-            byte[] bytes = ByteBuffer.allocate(8).putLong(s.arcWindow).array();
-            System.arraycopy(bytes, 0, value, 2, 8);
+            byte[] bytes = ByteBuffer.allocate(4).putInt(s.arcWindow).array();
+            System.arraycopy(bytes, 0, value, 2, 4);
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
@@ -301,7 +322,7 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
-            saActor.tell(new SA.StatusRequest(s.log, s.pum, s.replyTo));
+            saActor.tell(new SA.StatusRequest(s.log, s.pum, s.secMan));
         }
         return this;
     }
@@ -367,6 +388,18 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         }
         else {
             saActor.tell(new SA.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, tc.keyMan));
+        }
+        return this;
+    }
+
+    private Behavior<Command> onTM(GetTMInfo tm) {
+        ActorRef<SA.Command> saActor = this.sPiToActor.get(tm.sPi);
+        //TODO: what do I do when SA is not found -> FSR
+        if(saActor == null) {
+
+        }
+        else {
+            saActor.tell(new SA.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc, tm.keyMan));
         }
         return this;
     }

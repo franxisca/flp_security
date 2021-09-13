@@ -75,10 +75,10 @@ public class SA extends AbstractBehavior<SA.Command> {
     }
 
     public static final class SetARSNWindow implements Command {
-        final long arcWindow;
+        final int arcWindow;
         final ActorRef<Log.Command> log;
 
-        public SetARSNWindow(long arcWindow, ActorRef<Log.Command> log) {
+        public SetARSNWindow(int arcWindow, ActorRef<Log.Command> log) {
             this.arcWindow = arcWindow;
             this.log = log;
         }
@@ -151,6 +151,24 @@ public class SA extends AbstractBehavior<SA.Command> {
         }
     }
 
+    public static final class GetTMInfo implements Command {
+        final byte[] frameHeader;
+        final byte[] data;
+        final byte[] trailer;
+        final int channel;
+        final ActorRef<TMProcessor.Command> tmProc;
+        final ActorRef<KeyManager.Command> keyMan;
+
+        public GetTMInfo(byte[] frameHeader, byte[] data, byte[] trailer, int channel, ActorRef<TMProcessor.Command> tmProc, ActorRef<KeyManager.Command> keyMan) {
+            this.frameHeader = frameHeader;
+            this.data = data;
+            this.trailer = trailer;
+            this.channel = channel;
+            this.tmProc = tmProc;
+            this.keyMan = keyMan;
+        }
+    }
+
     public static Behavior<Command> create(short sPi, int authMaskLength, byte[] authBitMask, boolean critical) {
         return Behaviors.setup(context -> new SA(context, sPi, authMaskLength, authBitMask, critical));
     }
@@ -160,7 +178,7 @@ public class SA extends AbstractBehavior<SA.Command> {
     private byte[] aRC;
     private final int authMaskLength;
     private final byte[] authBitMask;
-    private long aRCWindow;
+    private int aRCWindow;
     private byte keyId;
     private ActorRef<Key.Command> keyActor;
     private SAState state;
@@ -171,7 +189,7 @@ public class SA extends AbstractBehavior<SA.Command> {
     //private long channelId;
     private final boolean critical;
 
-    private SA (ActorContext<Command> context, short sPi, byte[] iV, byte[] aRC, int authMaskLength, byte[] authBitMask, long aRCWindow, byte keyId, SAState state, ArrayList<Integer> channels, boolean critical) {
+    private SA (ActorContext<Command> context, short sPi, byte[] iV, byte[] aRC, int authMaskLength, byte[] authBitMask, int aRCWindow, byte keyId, SAState state, ArrayList<Integer> channels, boolean critical) {
         super(context);
         //this.sPi = new byte[sPi.length];
         this.sPi = sPi;
@@ -206,6 +224,7 @@ public class SA extends AbstractBehavior<SA.Command> {
                 .onMessage(ReadARSN.class, this::onReadARSN)
                 .onMessage(ReadARSNWindow.class, this::onReadARSNWindow)
                 .onMessage(GetTCInfo.class, this::onTC)
+                .onMessage(GetTMInfo.class, this::onTM)
                 .build();
     }
 
@@ -325,6 +344,7 @@ public class SA extends AbstractBehavior<SA.Command> {
 
     private Behavior<Command> onStatusRequest(StatusRequest s) {
         SAState[] trans;
+        byte transition;
         if (this.prevState != SAState.NAN) {
             byte tag = (byte) 0b10011111;
             short length = 4;
@@ -336,6 +356,7 @@ public class SA extends AbstractBehavior<SA.Command> {
             trans = new SAState[2];
             trans[0] = this.prevState;
             trans[1] = this.state;
+            transition = this.state.transition(trans[0], trans[1]);
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
@@ -349,8 +370,9 @@ public class SA extends AbstractBehavior<SA.Command> {
             trans[0] = this.prevState;
             trans[1] = this.state;
             s.log.tell(new Log.InsertEntry(tag, length, value));
+            transition = this.state.transition(trans[0], trans[1]);
         }
-        s.replyTo.tell(new PDUManager.SAStatusRequestReply(this.sPi, trans, s.secMan));
+        s.replyTo.tell(new PDUManager.SAStatusRequestReply(this.sPi, transition, s.secMan));
 
         return this;
     }
@@ -373,8 +395,8 @@ public class SA extends AbstractBehavior<SA.Command> {
         byte[] value = new byte[10];
         value[0] = (byte) (this.sPi & 0xff);
         value[1] = (byte) ((this.sPi >> 8) & 0xff);
-        byte[] bytes = ByteBuffer.allocate(8).putLong(this.aRCWindow).array();
-        System.arraycopy(bytes, 0, value, 2, 8);
+        byte[] bytes = ByteBuffer.allocate(4).putInt(this.aRCWindow).array();
+        System.arraycopy(bytes, 0, value, 2, 4);
         r.log.tell(new Log.InsertEntry(tag, length, value));
         r.replyTo.tell(new PDUManager.ReadARSNWindowReply(this.sPi, this.aRCWindow, r.secMan));
         return this;
@@ -394,7 +416,7 @@ public class SA extends AbstractBehavior<SA.Command> {
         else {
             this.state = SAState.OPERATIONAL;
             this.channels.add(s.channel);
-            s.module.tell(new Module.MapVC(s.channel, getContext().getSelf()));
+            s.module.tell(new Module.MapVC(s.channel, this.sPi));
             byte tag = (byte) 0b10011011;
             short length = 6;
             byte[] value = new byte[6];
@@ -414,7 +436,6 @@ public class SA extends AbstractBehavior<SA.Command> {
             //TODO: Bad SA flag?
         }
         //SA not applied on channel
-        //TODO: fix channel length
         //channel length fixed to 32 bits and stored as integer
         byte[] chan;
         BitSet bits = new BitSet(tc.vcId.length);
@@ -438,6 +459,18 @@ public class SA extends AbstractBehavior<SA.Command> {
             tc.keyMan.tell(new KeyManager.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, this.keyId, this.aRC, this.authBitMask));
         }
         //TODO: get keyActor, need keyManager reference for that :(
+        return this;
+    }
+
+    private Behavior<Command> onTM(GetTMInfo tm) {
+        //this.keyActor.tell(new );
+        if (this.keyActor != null) {
+            this.keyActor.tell(new Key.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, this.sPi, this.aRC, this.iV, this.authBitMask, tm.tmProc));
+        }
+        else {
+            tm.keyMan.tell(new KeyManager.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, this.sPi, this.aRC, this.iV, this.authBitMask, this.keyId, tm.tmProc));
+        }
+        //tm.tmProc.tell(new TMProcessor.TMInfo(tm.frameHeader, tm.data, tm.trailer, this.sPi, this.aRC, this.iV));
         return this;
     }
 }
