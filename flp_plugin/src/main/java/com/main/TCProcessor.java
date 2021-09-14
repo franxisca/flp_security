@@ -70,8 +70,9 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         final ActorRef<Module.Command> parent;
         final byte keyId;
         final byte[] key;
+        final short sPi;
 
-        public TC(boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, byte[] arc, byte[] authMask, ActorRef<Module.Command> parent, byte keyId, byte[] key) {
+        public TC(boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, byte[] arc, byte[] authMask, ActorRef<Module.Command> parent, byte keyId, byte[] key, short sPi) {
             this.vcId = vcId;
             this.primHeader = primHeader;
             this.secHeader = secHeader;
@@ -84,16 +85,36 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
             this.parent = parent;
             this.keyId = keyId;
             this.key = key;
+            this.sPi = sPi;
         }
+    }
+
+    public static final class BadSA implements Command {
+        final short sPi;
+        final byte[] secHeader;
+        final ActorRef<Module.Command> parent;
+
+        public BadSA(short sPi, byte[] secHeader, ActorRef<Module.Command> parent) {
+            this.sPi = sPi;
+            this.secHeader = secHeader;
+            this.parent = parent;
+        }
+
     }
 
 
     public static Behavior<Command> create() {
         return Behaviors.setup(context -> new TCProcessor(context));
     }
+    //final ActorRef<FSRHandler.Command> fsrHandler;
+    boolean alarmFlag;
+    short lastSpi;
+    byte lastArc;
 
     private TCProcessor(ActorContext<Command> context) {
         super(context);
+        //this.fsrHandler = getContext().spawn(FSRHandler.create(), "fsr");
+        this.alarmFlag = false;
     }
 
     @Override
@@ -101,6 +122,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         return newReceiveBuilder()
                 .onMessage(EncryptedTC.class, this::onEncTC)
                 .onMessage(TC.class, this::onTC)
+                .onMessage(BadSA.class, this::onBadSA)
                 .build();
     }
 
@@ -126,15 +148,6 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
 
 
         tc.parent.tell(new Module.GetTCInfo(sPi, vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, getContext().getSelf(), tc.parent));
-        //TODO: verify SA on VC
-        /*Timeout timeout = Timeout.create(Duration.ofSeconds(5));
-        Future<Object> future = Patterns.ask(tc.sam, timeout);
-        CompletableFuture<Object> future1 =
-                ask(actorA, "request", Duration.ofMillis(1000)).toCompletableFuture();*/
-        //TODO: verify SA is operational and keyActor is active
-        //TODO: decrypt and authenticate using keyActor from SA
-        //TODO: verify ARC
-        //TODO: FSR
         return this;
     }
 
@@ -158,17 +171,25 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
             int tcArc = bb.getInt(0);
             int saArc = bb.getInt(4);
             if(tcArc <= saArc) {
-                //TODO: arc failure, FSR
+                //this.fsrHandler.tell(new FSRHandler.BadSeq());
+                this.alarmFlag = true;
+                tc.parent.tell(new Module.TC(true, (byte) 0b00000011, null));
+                tc.parent.tell(new Module.FSR(this.alarmFlag, true, false, false, tc.sPi, c[3]));
             }
             else {
-                //TODO: verifictaion status, processSecurity Return
-                tc.parent.tell(new Module.TC());
+                tc.parent.tell(new Module.TC(false, (byte) 0b00000000, plaintext));
+                tc.parent.tell(new Module.FSR(this.alarmFlag, false, false, false, tc.sPi, c[3]));
             }
 
         }
         catch (Exception e) {
-            plaintext = new byte[0];
-            //TODO: FSR
+            byte[] c = new byte[4];
+            System.arraycopy(tc.secHeader, 2, c, 0, 4);
+            byte lastSN = c[3];
+            this.alarmFlag = true;
+            tc.parent.tell(new Module.TC(true, (byte) 0b00000010, null));
+            tc.parent.tell(new Module.FSR(this.alarmFlag, false, true, false, tc.sPi, lastSN));
+           // this.fsrHandler.tell(new FSRHandler.BadMAC());
         }
         return this;
     }
@@ -184,5 +205,17 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
         cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmParameterSpec);
         return cipher.doFinal(cipherText);
+    }
+
+    private Behavior<Command> onBadSA(BadSA b) {
+        //this.fsrHandler.tell(new FSRHandler.BadSA());
+        this.alarmFlag = true;
+        this.lastSpi = b.sPi;
+        byte[] arc = new byte[4];
+        System.arraycopy(b.secHeader, 2, arc, 0, 4);
+        this.lastArc = arc[3];
+        b.parent.tell(new Module.TC(true, (byte) 0b00000001, null));
+        b.parent.tell(new Module.FSR(this.alarmFlag, false, false, true, b.sPi, this.lastArc));
+        return this;
     }
 }

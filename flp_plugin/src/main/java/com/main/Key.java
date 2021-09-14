@@ -158,8 +158,9 @@ public class Key extends AbstractBehavior<Key.Command> {
         //final byte keyId;
         final byte[] arc;
         final byte[] authMask;
+        final short sPi;
 
-        public GetTCInfo(/*short sPi, */boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent/*, byte keyId*/, byte[] arc, byte[] authMask/*ActorRef<KeyManager.Command> keyMan*/) {
+        public GetTCInfo(/*short sPi, */boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent/*, byte keyId*/, byte[] arc, byte[] authMask, short sPi) {
             //this.sPi = sPi;
             this.vcId = vcId;
             this.primHeader = primHeader;
@@ -174,6 +175,7 @@ public class Key extends AbstractBehavior<Key.Command> {
             //this.keyId = keyId;
             this.arc = arc;
             this.authMask = authMask;
+            this.sPi = sPi;
         }
     }
 
@@ -314,11 +316,11 @@ public class Key extends AbstractBehavior<Key.Command> {
     private Behavior<Command> onTC(GetTCInfo tc) {
         //keyActor is not ACTIVE, should not happen
         if(this.keyState != KeyState.ACTIVE) {
-            //TODO -> FSR
+            tc.tcProc.tell(new TCProcessor.BadSA(tc.sPi, tc.secHeader, tc.parent));
         }
         //return keyActor to TCProcessor
         else {
-            tc.tcProc.tell(new TCProcessor.TC(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.arc, tc.authMask, tc.parent, this.keyId, this.key));
+            tc.tcProc.tell(new TCProcessor.TC(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.arc, tc.authMask, tc.parent, this.keyId, this.key, tc.sPi));
         }
         return this;
     }

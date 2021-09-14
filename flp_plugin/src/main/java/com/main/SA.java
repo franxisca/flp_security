@@ -432,7 +432,7 @@ public class SA extends AbstractBehavior<SA.Command> {
     private Behavior<Command> onTC(GetTCInfo tc) {
         //SA not in the right state
         if(this.state != SAState.OPERATIONAL) {
-            //TODO: Bad SA flag?
+            tc.tcProc.tell(new TCProcessor.BadSA(this.sPi, tc.secHeader, tc.parent));
         }
         //SA not applied on channel
         //channel length fixed to 32 bits and stored as integer
@@ -451,11 +451,12 @@ public class SA extends AbstractBehavior<SA.Command> {
         channel[2] = 0;
         System.arraycopy(chan, 0, channel, 3, 1);
         int channelInt = ByteBuffer.wrap(channel).getInt();
+        //SA not applicable on channel
         if(!this.channels.contains(channelInt)) {
-            //TODO: Bad SA flag?
+            tc.tcProc.tell(new TCProcessor.BadSA(this.sPi, tc.secHeader, tc.parent));
         }
         else {
-            tc.keyMan.tell(new KeyManager.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, this.keyId, this.aRC, this.authBitMask));
+            tc.keyMan.tell(new KeyManager.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, this.keyId, this.aRC, this.authBitMask, this.sPi));
         }
         return this;
     }

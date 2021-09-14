@@ -60,7 +60,33 @@ public class Module extends AbstractBehavior<Module.Command> {
     }
 
     public static final class TC implements Command {
+        final boolean verificationStatus;
+        final byte verStatCode;
+        final byte[] secReturn;
 
+        public TC(boolean verificationStatus, byte verStatCode, byte[] secReturn) {
+            this.verificationStatus = verificationStatus;
+            this.verStatCode = verStatCode;
+            this.secReturn = secReturn;
+        }
+    }
+
+    public static final class FSR implements Command {
+        final boolean alarmFlag;
+        final boolean badSN;
+        final boolean badMAC;
+        final boolean badSA;
+        final short lastSpi;
+        final byte lastSN;
+
+        public FSR(boolean alarmFlag, boolean badSN, boolean badMAC, boolean badSA, short lastSpi, byte lastSN) {
+            this.alarmFlag = alarmFlag;
+            this.badSN = badSN;
+            this.badMAC = badMAC;
+            this.badSA = badSA;
+            this.lastSpi = lastSpi;
+            this.lastSN = lastSN;
+        }
     }
 
     public static final class ReturnTM implements Command {

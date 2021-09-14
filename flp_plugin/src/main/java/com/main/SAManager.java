@@ -382,9 +382,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
 
     private Behavior<Command> onTC(GetTCInfo tc) {
         ActorRef<SA.Command> saActor = this.sPiToActor.get(tc.sPi);
-        //TODO: what do I do when SA is not found -> FSR
         if(saActor == null) {
-
+            tc.tcProc.tell(new TCProcessor.BadSA(tc.sPi, tc.secHeader, tc.parent));
         }
         else {
             saActor.tell(new SA.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, tc.keyMan));
@@ -394,9 +393,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
 
     private Behavior<Command> onTM(GetTMInfo tm) {
         ActorRef<SA.Command> saActor = this.sPiToActor.get(tm.sPi);
-        //TODO: what do I do when SA is not found -> FSR
         if(saActor == null) {
-
+            getContext().getLog().info("SA for TM not found");
         }
         else {
             saActor.tell(new SA.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc, tm.keyMan));
