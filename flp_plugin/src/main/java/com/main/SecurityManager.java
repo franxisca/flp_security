@@ -201,9 +201,9 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
                 break;
             }
             //alarm flag reset
-            //TODO
             case (byte) 0b00110111: {
-                this.pduMan.tell(new PDUManager.AlarmFlagReset());
+                //this.pduMan.tell(new PDUManager.AlarmFlagReset());
+                this.parent.tell(new Module.AlarmFlagReset());
                 break;
             }
 

@@ -284,11 +284,6 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //TODO
-    //refers to FSR, which is handled by frame processing, maybe just pass back to SecurityManager
-    public static final class AlarmFlagReset implements Command {
-
-    }
 
 
     public static final class KeyVerificationReply implements Command {

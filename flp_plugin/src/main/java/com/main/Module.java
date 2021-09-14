@@ -122,6 +122,10 @@ public class Module extends AbstractBehavior<Module.Command> {
         }
     }
 
+    public static final class AlarmFlagReset implements Command {
+
+    }
+
     public static Behavior<Command> create(ActorRef<PDUOutstream.Command> pduOut, int activeKeys) {
         return Behaviors.setup(context -> new Module(context, pduOut, activeKeys));
     }
@@ -130,6 +134,8 @@ public class Module extends AbstractBehavior<Module.Command> {
     private final ActorRef<PDUOutstream.Command> pduOut;
     private final int activeKeys;
     private final Map<Integer, Short> vcIdToSA= new HashMap<>();
+    private final ActorRef<TCProcessor.Command> tcProc;
+    private final ActorRef<TMProcessor.Command> tmProc;
     //TODO: needs to be configured
     private final Map<Integer, Short> vcIdToDefaultSA = new HashMap<>();
 
@@ -138,6 +144,8 @@ public class Module extends AbstractBehavior<Module.Command> {
         this.secMan = getContext().spawn(SecurityManager.create(getContext().getSelf(), activeKeys), "secMan");
         this.pduOut = pduOut;
         this.activeKeys = activeKeys;
+        this.tcProc = getContext().spawn(TCProcessor.create(), "tc-processor");
+        this.tmProc = getContext().spawn(TMProcessor.create(getContext().getSelf()), "tm-processor");
     }
 
     @Override
@@ -148,6 +156,7 @@ public class Module extends AbstractBehavior<Module.Command> {
                 .onMessage(GetTCInfo.class, this::onTC)
                 .onMessage(MapVC.class, this::onMapVC)
                 .onMessage(GetTMInfo.class, this::onTM)
+                .onMessage(AlarmFlagReset.class, this::onAlarm)
                 .build();
     }
 
@@ -175,12 +184,17 @@ public class Module extends AbstractBehavior<Module.Command> {
         short sPi = this.vcIdToSA.get(tm.channel);
         //no SA active on this channel, use default SA
         if(!this.vcIdToSA.containsKey(tm.channel)) {
-            //TODO
+            //TODO, needs to be configured
         }
         else {
             this.secMan.tell(new SecurityManager.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc, sPi));
             //saActor.tell(new SA.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc));
         }
+        return this;
+    }
+
+    private Behavior<Command> onAlarm(AlarmFlagReset a) {
+        this.tcProc.tell(new TCProcessor.Reset());
         return this;
     }
 }

@@ -102,6 +102,10 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
 
     }
 
+    public static final class Reset implements Command {
+
+    }
+
 
     public static Behavior<Command> create() {
         return Behaviors.setup(context -> new TCProcessor(context));
@@ -123,6 +127,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
                 .onMessage(EncryptedTC.class, this::onEncTC)
                 .onMessage(TC.class, this::onTC)
                 .onMessage(BadSA.class, this::onBadSA)
+                .onMessage(Reset.class, this::onReset)
                 .build();
     }
 
@@ -216,6 +221,11 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         this.lastArc = arc[3];
         b.parent.tell(new Module.TC(true, (byte) 0b00000001, null));
         b.parent.tell(new Module.FSR(this.alarmFlag, false, false, true, b.sPi, this.lastArc));
+        return this;
+    }
+
+    private Behavior<Command> onReset(Reset r) {
+        this.alarmFlag = false;
         return this;
     }
 }
