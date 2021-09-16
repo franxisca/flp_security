@@ -127,7 +127,6 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
             System.arraycopy(ciphertext, 0, toReturn, secHeader.length, ciphertext.length);
             System.arraycopy(tm.trailer, 0, toReturn, (secHeader.length + ciphertext.length), tm.trailer.length);
             this.parent.tell(new Module.ReturnTM(toReturn));
-            //TODO: increment arc and iv and handle overflow
             //arc overflow
             if(tm.arc[0] == -1 && tm.arc[1] == -1 && tm.arc[2] == -1 && tm.arc[3] == -1) {
                 this.parent.tell(new Module.ARCOverflow(tm.sPi, tm.channel));

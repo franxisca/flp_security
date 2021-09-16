@@ -32,7 +32,6 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
           // this.replyTo = replyTo;
        }
     }
-    //TODO: get upper bound for active keys for configuration
 
     //SecurityManager needs to pass reference to KeyManager when issuing otar to PDUManager
     //should work

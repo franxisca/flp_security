@@ -434,13 +434,13 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
 
     private Behavior<Command> onInitSA(InitSA in) {
         for(Map.Entry<Short, Byte> entry : in.critical.entrySet()) {
-            //TODO: figure out auth bitmask length
+            //just use empty bitmask as it is never used
             byte[] bitMask = new byte[0];
             ActorRef<SA.Command> saActor = getContext().spawn(SA.create(entry.getKey(), 0, bitMask, true, entry.getValue()), "sa" + entry.getKey());
             this.sPiToActor.put(entry.getKey(), saActor);
         }
         for(short spi : in.standard) {
-            //TODO: figure out auth bitmask length
+            //just use empty bitmask as it is never used
             byte[] bitMask = new byte[0];
             ActorRef<SA.Command> saActor = getContext().spawn(SA.create(spi, 0, bitMask, false, (byte) 0b11111111), "sa" + spi);
             this.sPiToActor.put(spi, saActor);

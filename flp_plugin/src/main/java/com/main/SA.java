@@ -195,7 +195,6 @@ public class SA extends AbstractBehavior<SA.Command> {
     //private ArrayList<Integer> channels;
     private ArrayList<Integer> channels;
     //private long channelId;
-    //TODO: differentiate between critical and non-critical
     private final boolean critical;
 
     private SA (ActorContext<Command> context, short sPi, byte[] iV, byte[] aRC, int authMaskLength, byte[] authBitMask, int aRCWindow, byte keyId, SAState state, ArrayList<Integer> channels, boolean critical) {
@@ -212,7 +211,6 @@ public class SA extends AbstractBehavior<SA.Command> {
         this.channels = channels;
         this.critical = critical;
     }
-    //TODO
     private SA (ActorContext<Command> context, short sPi, int authMaskLength, byte[] authBitMask, boolean critical) {
         super(context);
         this.sPi = sPi;

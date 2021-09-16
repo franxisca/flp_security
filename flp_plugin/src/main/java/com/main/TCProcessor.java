@@ -193,7 +193,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         return this;
     }
 
-    //TODO: handle authentication mask other than all ones
+    //authentication bitmask is not handled but is all ones anyway
     //TODO: check if decryption works that way
     private static byte[] decrypt(byte[] key, byte[] iv, byte[] data, byte[] tag, byte[] authMask) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");

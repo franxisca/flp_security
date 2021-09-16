@@ -224,7 +224,6 @@ public class Module extends AbstractBehavior<Module.Command> {
     private final Map<Integer, Short> vcIdToSA= new HashMap<>();
     private final ActorRef<TCProcessor.Command> tcProc;
     private final ActorRef<TMProcessor.Command> tmProc;
-    //TODO: needs to be configured
     private Map<Integer, Short> vcIdToDefaultSA = new HashMap<>();
     private final ActorRef<GuardianActor.Command> parent;
 
@@ -270,6 +269,7 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onPDUout(PDUOut p) {
         //TODO
+        System.out.println(p.pdu);
         //this.pduOut.tell(new PDUOutstream.PDU(p.pdu));
         return this;
     }
@@ -322,6 +322,9 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onTCOut(TCOut tc) {
         //TODO
+        System.out.println(tc.verificationStatus);
+        System.out.println(tc.verStatCode);
+        System.out.println(tc.secReturn);
         //this.tcOut.tell(new TCOutstream.TC(tc.secReturn, tc.verificationStatus, tc.verStatCode));
         return this;
     }
@@ -339,6 +342,7 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onTMOut(ReturnTM tm) {
         //TODO
+        System.out.println(tm.tm);
         //this.tmOut.tell(new TMOutStream.TM(tm.tm));
         return this;
     }
