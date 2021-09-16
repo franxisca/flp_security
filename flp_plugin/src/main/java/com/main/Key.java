@@ -204,14 +204,14 @@ public class Key extends AbstractBehavior<Key.Command> {
         }
     }
 
-    public static Behavior<Command> create(byte keyId, byte[] key, boolean startUp) {
-        return Behaviors.setup(context -> new Key(context, keyId, key, startUp));
+    public static Behavior<Command> create(byte keyId, byte[] key, boolean master) {
+        return Behaviors.setup(context -> new Key(context, keyId, key, master));
     }
 
     private final byte keyId;
     private final byte[] key;
     private KeyState keyState;
-    private boolean startUp;
+    private boolean master;
     private boolean inUse;
 
     private Key(ActorContext<Command> context, byte keyId, byte[] key, boolean startUp){
@@ -219,7 +219,7 @@ public class Key extends AbstractBehavior<Key.Command> {
         this.keyId = keyId;
         this.key = key;
         this.keyState = KeyState.POWERED_OFF;
-        this.startUp = startUp;
+        this.master = startUp;
         context.getLog().info("Key with ID {} initialized", keyId);
     }
 
@@ -309,7 +309,16 @@ public class Key extends AbstractBehavior<Key.Command> {
     }
 
     private Behavior<Command> onMaster(GetMaster m) {
-        m.keyMan.tell(new KeyManager.DecOtar(this.keyId, this.key, m.iv, m.mac, m.keys, m.log));
+        if(!this.master) {
+            byte tag = (byte) 0b00100001;
+            short length  = 1;
+            byte[] value = new byte[1];
+            value[0] = this.keyId;
+            m.log.tell(new Log.InsertEntry(tag, length, value));
+        }
+        else {
+            m.keyMan.tell(new KeyManager.DecOtar(this.keyId, this.key, m.iv, m.mac, m.keys, m.log));
+        }
         return this;
     }
 

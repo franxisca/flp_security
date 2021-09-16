@@ -9,6 +9,7 @@ import akka.actor.typed.javadsl.Receive;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class SAManager extends AbstractBehavior<SAManager.Command> {
@@ -193,6 +194,16 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         }
     }
 
+    public static final class InitSA implements Command {
+        final Map<Short, Byte> critical;
+        final List<Short> standard;
+
+        public InitSA(Map<Short, Byte> spiToCritical, List<Short> standard) {
+            this.critical = spiToCritical;
+            this.standard = standard;
+        }
+    }
+
 
     public static Behavior<Command> create() {
         return Behaviors.setup(context -> new SAManager(context));
@@ -218,6 +229,7 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
                 .onMessage(ReadARSNWindow.class, this::onReadARSNWindow)
                 .onMessage(GetTCInfo.class, this::onTC)
                 .onMessage(GetTMInfo.class, this::onTM)
+                .onMessage(InitSA.class, this::onInitSA)
                 .build();
     }
 
@@ -398,6 +410,22 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         }
         else {
             saActor.tell(new SA.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc, tm.keyMan));
+        }
+        return this;
+    }
+
+    private Behavior<Command> onInitSA(InitSA in) {
+        for(Map.Entry<Short, Byte> entry : in.critical.entrySet()) {
+            //TODO: figure out auth bitmask length
+            byte[] bitMask = new byte[0];
+            ActorRef<SA.Command> saActor = getContext().spawn(SA.create(entry.getKey(), 0, bitMask, true, entry.getValue()), "sa" + entry.getKey());
+            this.sPiToActor.put(entry.getKey(), saActor);
+        }
+        for(short spi : in.standard) {
+            //TODO: figure out auth bitmask length
+            byte[] bitMask = new byte[0];
+            ActorRef<SA.Command> saActor = getContext().spawn(SA.create(spi, 0, bitMask, false, (byte) 0b11111111), "sa" + spi);
+            this.sPiToActor.put(spi, saActor);
         }
         return this;
     }

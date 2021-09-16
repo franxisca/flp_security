@@ -24,7 +24,6 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
 
     public interface Command {}
 
-    //TODO: what input do I det exactly? entire frame or as specified payload without trailer and vc id? how long is vc id?
     //now assuming entire frame
     public static final class RawTM implements Command {
         //6 bytes
@@ -105,7 +104,6 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
         byVc[2] = 0;
         System.arraycopy(bytes, 0, byVc, 3, 1);
         int channelInt = ByteBuffer.wrap(byVc).getInt();
-        //TODO: is SA configured for VC if it is started on it?
         this.parent.tell(new Module.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, channelInt, getContext().getSelf()));
         return this;
     }
@@ -129,7 +127,7 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
             this.parent.tell(new Module.ReturnTM(toReturn));
         }
         catch (Exception e) {
-
+            //TODO
         }
         return this;
     }

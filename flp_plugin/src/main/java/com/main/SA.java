@@ -169,8 +169,8 @@ public class SA extends AbstractBehavior<SA.Command> {
         }
     }
 
-    public static Behavior<Command> create(short sPi, int authMaskLength, byte[] authBitMask, boolean critical) {
-        return Behaviors.setup(context -> new SA(context, sPi, authMaskLength, authBitMask, critical));
+    public static Behavior<Command> create(short sPi, int authMaskLength, byte[] authBitMask, boolean critical, byte keyId) {
+        return Behaviors.setup(context -> new SA(context, sPi, authMaskLength, authBitMask, critical, keyId));
     }
 
     private final short sPi;
@@ -187,6 +187,7 @@ public class SA extends AbstractBehavior<SA.Command> {
     //private ArrayList<Integer> channels;
     private ArrayList<Integer> channels;
     //private long channelId;
+    //TODO: differentiate between critical and non-critical
     private final boolean critical;
 
     private SA (ActorContext<Command> context, short sPi, byte[] iV, byte[] aRC, int authMaskLength, byte[] authBitMask, int aRCWindow, byte keyId, SAState state, ArrayList<Integer> channels, boolean critical) {
@@ -203,12 +204,28 @@ public class SA extends AbstractBehavior<SA.Command> {
         this.channels = channels;
         this.critical = critical;
     }
+    //TODO
     private SA (ActorContext<Command> context, short sPi, int authMaskLength, byte[] authBitMask, boolean critical) {
         super(context);
         this.sPi = sPi;
         this.authBitMask = authBitMask;
         this.authMaskLength = authMaskLength;
         this.critical = critical;
+    }
+
+    private SA(ActorContext<Command> context, short sPi, int authMaskLength, byte[] authBitMask, boolean critical, byte keyId) {
+        super(context);
+        this.sPi = sPi;
+        this.authBitMask = authBitMask;
+        this.authMaskLength = authMaskLength;
+        this.critical = critical;
+        this.keyId = keyId;
+        if(critical) {
+            this.state = SAState.OPERATIONAL;
+        }
+        else {
+            this.state = SAState.UNKEYED;
+        }
     }
 
     @Override

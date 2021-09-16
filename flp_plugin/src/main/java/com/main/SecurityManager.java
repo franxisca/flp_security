@@ -8,6 +8,8 @@ import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 
 public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
 
@@ -77,6 +79,27 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
             this.pdu = pdu;
         }
     }
+
+    public static final class InitSA implements Command {
+        final Map<Short, Byte> criticalSAs;
+        final List<Short> standardSAs;
+
+        public InitSA(Map<Short, Byte> spiToCritical, List<Short> standardSAs) {
+            this.criticalSAs = spiToCritical;
+            this.standardSAs = standardSAs;
+        }
+    }
+
+    public static final class InitKey implements Command {
+        final Map<Byte, byte[]> master;
+        final Map<Byte, byte[]> session;
+
+        public InitKey(Map<Byte, byte[]> master, Map<Byte, byte[]> session) {
+            this.master = master;
+            this.session = session;
+        }
+    }
+
     public static Behavior<Command> create(ActorRef<Module.Command> parent, int activeKeys) {
         return Behaviors.setup(context -> new SecurityManager(context, parent, activeKeys));
     }
@@ -105,6 +128,8 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
                 .onMessage(PDUReply.class, this::onPDUReply)
                 .onMessage(GetTCInfo.class, this::onTC)
                 .onMessage(GetTMInfo.class, this::onTM)
+                .onMessage(InitSA.class, this::onInitSA)
+                .onMessage(InitKey.class, this::onInitKey)
                 .build();
     }
 
@@ -235,6 +260,15 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
 
     private Behavior<Command> onTM(GetTMInfo tm) {
         this.saMan.tell(new SAManager.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc, tm.sPi, this.keyMan));
+        return this;
+    }
+
+    private Behavior<Command> onInitSA(InitSA in) {
+        this.saMan.tell(new SAManager.InitSA(in.criticalSAs, in.standardSAs));
+        return this;
+    }
+    private Behavior<Command> onInitKey(InitKey in) {
+        this.keyMan.tell(new KeyManager.Init(in.master, in.session));
         return this;
     }
 }

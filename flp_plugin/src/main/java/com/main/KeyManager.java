@@ -237,6 +237,16 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
     }
 
+    public static final class Init implements Command {
+        final Map<Byte, byte[]> master;
+        final Map<Byte, byte[]> session;
+
+        public Init(Map<Byte, byte[]> master, Map<Byte, byte[]> session) {
+            this.master = master;
+            this.session = session;
+        }
+    }
+
     private final int activeKeys;
     private int currentlyActive;
 
@@ -266,6 +276,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
                 .onMessage(KeyDestruction.class, this::onDestruction)
                 .onMessage(GetTCInfo.class, this::onTC)
                 .onMessage(GetTMInfo.class, this::onTM)
+                .onMessage(Init.class, this::onInit)
                 .build();
     }
 
@@ -555,6 +566,18 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         }
         else {
             keyActor.tell(new Key.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.sPi, tm.arc, tm.iv, tm.authMask, tm.tmProc));
+        }
+        return this;
+    }
+
+    private Behavior<Command> onInit(Init i) {
+        for(Map.Entry<Byte, byte[]> entry : i.master.entrySet()) {
+            ActorRef<Key.Command> keyActor = getContext().spawn(Key.create(entry.getKey(), entry.getValue(), true), "key" + entry.getKey());
+            this.keyIdToActor.put(entry.getKey(), keyActor);
+        }
+        for (Map.Entry<Byte, byte[]> entry : i.session.entrySet()) {
+            ActorRef<Key.Command> keyActor = getContext().spawn(Key.create(entry.getKey(), entry.getValue(), false), "key" + entry.getKey());
+            this.keyIdToActor.put(entry.getKey(), keyActor);
         }
         return this;
     }

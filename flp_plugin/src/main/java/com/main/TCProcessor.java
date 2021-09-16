@@ -6,8 +6,6 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
-import akka.pattern.Patterns;
-import akka.util.Timeout;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -19,10 +17,6 @@ import static akka.pattern.Patterns.pipe;
 
 
 import java.nio.ByteBuffer;
-import java.time.Duration;
-import java.util.BitSet;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
 
 public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
 
@@ -41,9 +35,9 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         final byte[] secTrailer;
         final byte[] crc;
         final ActorRef<Module.Command> parent;
-        final ActorRef sam;
+        //final ActorRef sam;
 
-        public EncryptedTC(byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<Module.Command> parent, ActorRef sam) {
+        public EncryptedTC(byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<Module.Command> parent) {
             this.primHeader = primHeader;
             this.secHeader = secHeader;
             this.data = data;
@@ -51,7 +45,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
             this.secTrailer = secTrailer;
             this.crc = crc;
             this.parent = parent;
-            this.sam = sam;
+            //this.sam = sam;
         }
 
     }
@@ -178,11 +172,11 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
             if(tcArc <= saArc) {
                 //this.fsrHandler.tell(new FSRHandler.BadSeq());
                 this.alarmFlag = true;
-                tc.parent.tell(new Module.TC(true, (byte) 0b00000011, null));
+                tc.parent.tell(new Module.TCOut(true, (byte) 0b00000011, null));
                 tc.parent.tell(new Module.FSR(this.alarmFlag, true, false, false, tc.sPi, c[3]));
             }
             else {
-                tc.parent.tell(new Module.TC(false, (byte) 0b00000000, plaintext));
+                tc.parent.tell(new Module.TCOut(false, (byte) 0b00000000, plaintext));
                 tc.parent.tell(new Module.FSR(this.alarmFlag, false, false, false, tc.sPi, c[3]));
             }
 
@@ -192,7 +186,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
             System.arraycopy(tc.secHeader, 2, c, 0, 4);
             byte lastSN = c[3];
             this.alarmFlag = true;
-            tc.parent.tell(new Module.TC(true, (byte) 0b00000010, null));
+            tc.parent.tell(new Module.TCOut(true, (byte) 0b00000010, null));
             tc.parent.tell(new Module.FSR(this.alarmFlag, false, true, false, tc.sPi, lastSN));
            // this.fsrHandler.tell(new FSRHandler.BadMAC());
         }
@@ -219,7 +213,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         byte[] arc = new byte[4];
         System.arraycopy(b.secHeader, 2, arc, 0, 4);
         this.lastArc = arc[3];
-        b.parent.tell(new Module.TC(true, (byte) 0b00000001, null));
+        b.parent.tell(new Module.TCOut(true, (byte) 0b00000001, null));
         b.parent.tell(new Module.FSR(this.alarmFlag, false, false, true, b.sPi, this.lastArc));
         return this;
     }
