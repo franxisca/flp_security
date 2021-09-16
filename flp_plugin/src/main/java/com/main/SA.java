@@ -169,6 +169,14 @@ public class SA extends AbstractBehavior<SA.Command> {
         }
     }
 
+    public static final class ArcIncrement implements Command {
+
+    }
+
+    public static final class IvIncrement implements Command {
+
+    }
+
     public static Behavior<Command> create(short sPi, int authMaskLength, byte[] authBitMask, boolean critical, byte keyId) {
         return Behaviors.setup(context -> new SA(context, sPi, authMaskLength, authBitMask, critical, keyId));
     }
@@ -226,6 +234,18 @@ public class SA extends AbstractBehavior<SA.Command> {
         else {
             this.state = SAState.UNKEYED;
         }
+        this.aRC = new byte[4];
+       for(int i = 0; i < 4; i++) {
+           this.aRC[i] = 0;
+       }
+       this.aRCWindow = Integer.MAX_VALUE;
+       this.iV = new byte[12];
+       this.iV[0] = (byte) (this.sPi & 0xff);
+       this.iV[1] = (byte) ((this.sPi >> 8) & 0xff);
+       for(int i = 2; i < 12; i++) {
+           this.iV[i] = 0;
+       }
+
     }
 
     @Override
@@ -242,6 +262,8 @@ public class SA extends AbstractBehavior<SA.Command> {
                 .onMessage(ReadARSNWindow.class, this::onReadARSNWindow)
                 .onMessage(GetTCInfo.class, this::onTC)
                 .onMessage(GetTMInfo.class, this::onTM)
+                .onMessage(ArcIncrement.class, this::onARC)
+                .onMessage(IvIncrement.class, this::onIV)
                 .build();
     }
 
@@ -288,6 +310,7 @@ public class SA extends AbstractBehavior<SA.Command> {
             this.keyActor =r.keyActor;
             this.state = SAState.KEYED;
             this.prevState = SAState.UNKEYED;
+            //TODO: ask if arc isn't just reset to 0
             this.aRC = r.arc;
             this.iV = r.iv;
             //log success
@@ -487,6 +510,40 @@ public class SA extends AbstractBehavior<SA.Command> {
             tm.keyMan.tell(new KeyManager.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, this.sPi, this.aRC, this.iV, this.authBitMask, this.keyId, tm.tmProc));
         }
         //tm.tmProc.tell(new TMProcessor.TMInfo(tm.frameHeader, tm.data, tm.trailer, this.sPi, this.aRC, this.iV));
+        return this;
+    }
+
+    private Behavior<Command> onARC(ArcIncrement arc) {
+        if(this.aRC[3] != -1) {
+            this.aRC[3] = (byte) (this.aRC[3] + 1);
+        }
+        else if(this.aRC[2] != -1) {
+            this.aRC[2] = (byte) (this.aRC[2] + 1);
+        }
+        else if(this.aRC[1] != -1) {
+            this.aRC[1] = (byte) (this.aRC[1] + 1);
+        }
+        else if(this.aRC[0] != -1) {
+            this.aRC[0] = (byte) (this.aRC[0] + 1);
+        }
+        else {
+            getContext().getLog().info("could not increment arc for spi" + this.sPi);
+        }
+        return this;
+    }
+
+    private Behavior<Command> onIV(IvIncrement iv) {
+        boolean inc = false;
+        for(int i = this.iV.length - 1; i >= 0; i--) {
+            if(this.iV[i] != -1) {
+                this.iV[i] = (byte) (this.iV[i] + 1);
+                inc = true;
+                break;
+            }
+        }
+        if(!inc) {
+            getContext().getLog().info("could not increment iv for spi" + this.sPi);
+        }
         return this;
     }
 }

@@ -7,6 +7,7 @@ import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -175,6 +176,42 @@ public class Module extends AbstractBehavior<Module.Command> {
         }
     }
 
+    public static final class ARCOverflow implements Command {
+        final short sPi;
+        final int channel;
+
+        public ARCOverflow(short sPi, int channel) {
+            this.sPi = sPi;
+            this.channel = channel;
+        }
+    }
+
+    public static final class ARCIncrement implements Command {
+        final short sPi;
+
+        public ARCIncrement(short sPi) {
+            this.sPi = sPi;
+        }
+    }
+
+    public static final class IVOverflow implements Command {
+        final short sPi;
+        final int channel;
+
+        public IVOverflow(short sPi, int channel) {
+            this.sPi = sPi;
+            this.channel = channel;
+        }
+    }
+
+    public static final class IVIncrement implements Command {
+        final short sPi;
+
+        public IVIncrement(short sPi) {
+            this.sPi = sPi;
+        }
+    }
+
     public static Behavior<Command> create(ActorRef<PDUOutstream.Command> pduOut, int activeKeys, ActorRef<TMOutStream.Command> tmOut, ActorRef<TCOutstream.Command> tcOut, ActorRef<GuardianActor.Command> parent) {
         return Behaviors.setup(context -> new Module(context, pduOut, activeKeys, tmOut, tcOut, parent));
     }
@@ -219,6 +256,10 @@ public class Module extends AbstractBehavior<Module.Command> {
                 .onMessage(InitSA.class, this::onInitSA)
                 .onMessage(InitKey.class, this::onInitKey)
                 .onMessage(DefaultSA.class, this::onDefaultSA)
+                .onMessage(ARCOverflow.class, this::onArcOverflow)
+                .onMessage(IVOverflow.class, this::onIVOverflow)
+                .onMessage(ARCIncrement.class, this::onArcIncrement)
+                .onMessage(IVIncrement.class, this::onIVIncrement)
                 .build();
     }
 
@@ -314,6 +355,65 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onInitKey(InitKey in) {
         this.secMan.tell(new SecurityManager.InitKey(in.master, in.session));
+        return this;
+    }
+
+    //TODO:check
+    private Behavior<Command> onArcOverflow(ARCOverflow arc) {
+        byte[] pdu = new byte[5];
+        pdu[0] = (byte) 0b00011110;
+        short length = 2;
+        pdu[1] = (byte) (length & 0xff);
+        pdu[2] = (byte) ((length >> 8) & 0xff);
+        pdu[3] = (byte) (arc.sPi & 0xff);
+        pdu[4] = (byte) ((arc.sPi >> 8) & 0xff);
+        this.secMan.tell(new SecurityManager.PDU(pdu));
+        byte[] start = new byte[9];
+        short temp = 0b0000000000000001;
+        short nSpi = (short) (arc.sPi ^ temp);
+        start[0] = (byte) 0b00011011;
+        short length2 = 6;
+        start[1] = (byte) (length2 & 0xff);
+        start[2] = (byte) ((length2 >> 8) & 0xff);
+        start[3] = (byte) (nSpi & 0xff);
+        start[4] = (byte) ((nSpi >> 8) & 0xff);
+        byte[] bytes = ByteBuffer.allocate(4).putInt(arc.channel).array();
+        System.arraycopy(bytes, 0, start, 5, 4);
+        this.secMan.tell(new SecurityManager.PDU(start));
+        return this;
+    }
+
+    private Behavior<Command> onIVOverflow(IVOverflow iv) {
+        byte[] pdu = new byte[5];
+        pdu[0] = (byte) 0b00011110;
+        short length = 2;
+        pdu[1] = (byte) (length & 0xff);
+        pdu[2] = (byte) ((length >> 8) & 0xff);
+        pdu[3] = (byte) (iv.sPi & 0xff);
+        pdu[4] = (byte) ((iv.sPi >> 8) & 0xff);
+        this.secMan.tell(new SecurityManager.PDU(pdu));
+        byte[] start = new byte[9];
+        short temp = 0b0000000000000001;
+        short nSpi = (short) (iv.sPi ^ temp);
+        start[0] = (byte) 0b00011011;
+        short length2 = 6;
+        start[1] = (byte) (length2 & 0xff);
+        start[2] = (byte) ((length2 >> 8) & 0xff);
+        start[3] = (byte) (nSpi & 0xff);
+        start[4] = (byte) ((nSpi >> 8) & 0xff);
+        byte[] bytes = ByteBuffer.allocate(4).putInt(iv.channel).array();
+        System.arraycopy(bytes, 0, start, 5, 4);
+        this.secMan.tell(new SecurityManager.PDU(start));
+        return this;
+    }
+
+    private Behavior<Command> onArcIncrement(ARCIncrement arc) {
+        this.secMan.tell(new SecurityManager.ArcIncrement(arc.sPi));
+        return this;
+    }
+
+    private Behavior<Command> onIVIncrement(IVIncrement iv) {
+        this.secMan.tell(new SecurityManager.IvIncrement(iv.sPi));
         return this;
     }
 }

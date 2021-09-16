@@ -379,7 +379,7 @@ public class Key extends AbstractBehavior<Key.Command> {
     }
 
     private Behavior<Command> onTM (GetTMInfo tm) {
-        tm.tmProc.tell(new TMProcessor.TMInfo(tm.frameHeader, tm.data, tm.trailer, tm.sPi, tm.arc, tm.iv, this.key, tm.authMask));
+        tm.tmProc.tell(new TMProcessor.TMInfo(tm.frameHeader, tm.data, tm.trailer, tm.sPi, tm.arc, tm.iv, this.key, tm.authMask, tm.channel));
         return this;
     }
 

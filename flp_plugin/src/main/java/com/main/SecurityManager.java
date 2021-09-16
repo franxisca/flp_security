@@ -100,6 +100,22 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
         }
     }
 
+    public static final class ArcIncrement implements Command {
+        final short sPi;
+
+        public ArcIncrement(short sPi) {
+            this.sPi = sPi;
+        }
+    }
+
+    public static final class IvIncrement implements Command {
+        final short sPi;
+
+        public IvIncrement(short sPi) {
+            this.sPi = sPi;
+        }
+    }
+
     public static Behavior<Command> create(ActorRef<Module.Command> parent, int activeKeys) {
         return Behaviors.setup(context -> new SecurityManager(context, parent, activeKeys));
     }
@@ -130,6 +146,8 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
                 .onMessage(GetTMInfo.class, this::onTM)
                 .onMessage(InitSA.class, this::onInitSA)
                 .onMessage(InitKey.class, this::onInitKey)
+                .onMessage(ArcIncrement.class, this::onARC)
+                .onMessage(IvIncrement.class, this::onIV)
                 .build();
     }
 
@@ -269,6 +287,16 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
     }
     private Behavior<Command> onInitKey(InitKey in) {
         this.keyMan.tell(new KeyManager.Init(in.master, in.session));
+        return this;
+    }
+
+    private Behavior<Command> onARC(ArcIncrement arc) {
+        this.saMan.tell(new SAManager.ArcIncrement(arc.sPi));
+        return this;
+    }
+
+    private Behavior<Command> onIV(IvIncrement iv) {
+        this.saMan.tell(new SAManager.IvIncrement(iv.sPi));
         return this;
     }
 }

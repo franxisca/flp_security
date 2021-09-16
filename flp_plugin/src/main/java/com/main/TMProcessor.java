@@ -49,8 +49,9 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
         final byte[] iv;
         final byte[] key;
         final byte[] authMask;
+        final int channel;
 
-        public TMInfo(byte[] frameHeader, byte[] data, byte[] trailer, short sPi, byte[] arc, byte[] iv, byte[] key, byte[] authMask) {
+        public TMInfo(byte[] frameHeader, byte[] data, byte[] trailer, short sPi, byte[] arc, byte[] iv, byte[] key, byte[] authMask, int channel) {
             this.frameHeader = frameHeader;
             this.data = data;
             this.trailer = trailer;
@@ -59,6 +60,7 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
             this.iv = iv;
             this.key = key;
             this.authMask = authMask;
+            this.channel = channel;
         }
     }
 
@@ -109,7 +111,7 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
     }
 
     private Behavior<Command> onTM(TMInfo tm) {
-        //TODO: handle authentication Bitmask
+        //authentication bitmask is unhandled but is specified as all ones anyway
         byte[] secHeader = new byte[SPI_SIZE + ARC_SIZE + IV_SIZE];
         byte[] sPi = ByteBuffer.allocate(2).putShort(tm.sPi).array();
         System.arraycopy(sPi, 0, secHeader, 0, 2);
@@ -125,9 +127,32 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
             System.arraycopy(ciphertext, 0, toReturn, secHeader.length, ciphertext.length);
             System.arraycopy(tm.trailer, 0, toReturn, (secHeader.length + ciphertext.length), tm.trailer.length);
             this.parent.tell(new Module.ReturnTM(toReturn));
+            //TODO: increment arc and iv and handle overflow
+            //arc overflow
+            if(tm.arc[0] == -1 && tm.arc[1] == -1 && tm.arc[2] == -1 && tm.arc[3] == -1) {
+                this.parent.tell(new Module.ARCOverflow(tm.sPi, tm.channel));
+            }
+            //increment arc
+            else {
+                this.parent.tell(new Module.ARCIncrement(tm.sPi));
+            }
+            boolean overflow = true;
+            for(int i = 2; i < 12; i++) {
+                if(tm.iv[i] != -1) {
+                    overflow = false;
+                }
+            }
+            //iv overflow
+            if(overflow) {
+                this.parent.tell(new Module.IVOverflow(tm.sPi, tm.channel));
+            }
+            //increment iv
+            else {
+                this.parent.tell(new Module.IVIncrement(tm.sPi));
+            }
         }
         catch (Exception e) {
-            //TODO
+            getContext().getLog().info("TM encryption error!");
         }
         return this;
     }

@@ -204,6 +204,22 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         }
     }
 
+    public static final class ArcIncrement implements Command {
+        final short sPi;
+
+        public ArcIncrement(short sPi) {
+            this.sPi = sPi;
+        }
+    }
+
+    public static final class IvIncrement implements Command {
+        final short sPi;
+
+        public IvIncrement(short sPi) {
+            this.sPi = sPi;
+        }
+    }
+
 
     public static Behavior<Command> create() {
         return Behaviors.setup(context -> new SAManager(context));
@@ -230,6 +246,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
                 .onMessage(GetTCInfo.class, this::onTC)
                 .onMessage(GetTMInfo.class, this::onTM)
                 .onMessage(InitSA.class, this::onInitSA)
+                .onMessage(ArcIncrement.class, this::onARC)
+                .onMessage(IvIncrement.class, this::onIV)
                 .build();
     }
 
@@ -426,6 +444,28 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             byte[] bitMask = new byte[0];
             ActorRef<SA.Command> saActor = getContext().spawn(SA.create(spi, 0, bitMask, false, (byte) 0b11111111), "sa" + spi);
             this.sPiToActor.put(spi, saActor);
+        }
+        return this;
+    }
+
+    private Behavior<Command> onARC(ArcIncrement arc) {
+        ActorRef<SA.Command> saActor = this.sPiToActor.get(arc.sPi);
+        if(saActor == null) {
+            getContext().getLog().info("could not increase arc for spi" + arc.sPi);
+        }
+        else {
+            saActor.tell(new SA.ArcIncrement());
+        }
+        return this;
+    }
+
+    private Behavior<Command> onIV(IvIncrement iv) {
+        ActorRef<SA.Command> saActor = this.sPiToActor.get(iv.sPi);
+        if(saActor == null) {
+            getContext().getLog().info("could not increase iv for spi" + iv.sPi);
+        }
+        else {
+            saActor.tell(new SA.IvIncrement());
         }
         return this;
     }
