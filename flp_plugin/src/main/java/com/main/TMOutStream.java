@@ -2,7 +2,7 @@ package com.main;
 
 import akka.actor.typed.javadsl.AbstractBehavior;
 
-public class TMOutStream extends AbstractBehavior<TMOutStream.Command> {
+public class TMOutStream /*extends AbstractBehavior<TMOutStream.Command> */{
 
     public interface Command {}
 

@@ -5,8 +5,8 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 
 public class StandardSA {
 
-    public static Behavior<SA.Command> create(byte[] sPi, int authMaskLength, byte[] authBitMask) {
-        return SA.create(sPi, authMaskLength, authBitMask, false);
-    }
+    /*public static Behavior<SA.Command> create(byte[] sPi, int authMaskLength, byte[] authBitMask) {
+        //return SA.create(sPi, authMaskLength, authBitMask, false);
+    }*/
 
 }

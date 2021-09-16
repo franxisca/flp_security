@@ -2,7 +2,7 @@ package com.main;
 
 import akka.actor.typed.javadsl.AbstractBehavior;
 
-public class PDUOutstream extends AbstractBehavior<PDUOutstream.Command> {
+public class PDUOutstream /*extends AbstractBehavior<PDUOutstream.Command>*/ {
 
     public interface Command {}
 
