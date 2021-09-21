@@ -8,10 +8,7 @@ import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Module extends AbstractBehavior<Module.Command> {
 
@@ -269,7 +266,7 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onPDUout(PDUOut p) {
         //TODO
-        System.out.println(p.pdu);
+        System.out.println(Arrays.toString(p.pdu));
         //this.pduOut.tell(new PDUOutstream.PDU(p.pdu));
         return this;
     }

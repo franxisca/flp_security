@@ -43,27 +43,45 @@ public class GuardianActor extends AbstractBehavior<GuardianActor.Command> {
         }
     }
 
+    public static final class PDU implements Command {
+        final byte[] pdu;
+
+        public PDU(byte[] pdu) {
+            this.pdu = pdu;
+        }
+    }
+
     static Behavior<Command> create() {
         return Behaviors.setup(GuardianActor::new);
     }
 
+    private ActorRef<Module.Command> module;
+
     private GuardianActor(ActorContext<Command> context) {
         super(context);
+        module = null;
     }
 
     @Override
     public Receive<Command> createReceive() {
         return newReceiveBuilder()
                 .onMessage(Start.class, this::onStart)
+                .onMessage(PDU.class, this::onPDU)
                 .build();
     }
 
     private Behavior<Command> onStart(Start s) {
         //TODO
         ActorRef<Module.Command> module1 = getContext().spawn(Module.create(null, s.active1, null, null, getContext().getSelf()), "module-1");
+        this.module = module1;
         module1.tell(new Module.InitSA(s.criticalSA1, s.standardSA1));
         module1.tell(new Module.DefaultSA(s.vcToDefaultSA1));
         module1.tell(new Module.InitKey(s.masterKeys, s.sessionKeys));
+        return this;
+    }
+
+    private Behavior<Command> onPDU(PDU pdu) {
+        this.module.tell(new Module.PDUIn(pdu.pdu));
         return this;
     }
 }
