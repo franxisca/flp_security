@@ -276,8 +276,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //should work
-    //TODO: test
+    //works
     public static final class EraseLog implements Command {
         final ActorRef<SecurityManager.Command> replyTo;
         final ActorRef<Log.Command> log;

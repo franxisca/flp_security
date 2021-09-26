@@ -169,6 +169,10 @@ public class Main {
                 testSetARSNWindow(mainActor);
                 Thread.sleep(3000);
                 testReadARSNWindow(mainActor);
+                Thread.sleep(3000);
+                testDumpLog(mainActor);
+                Thread.sleep(3000);
+                testEraseLog(mainActor);
                 try {
                     System.out.println(">>> Press ENTER to exit <<<");
                     System.in.read();
@@ -384,6 +388,15 @@ public class Main {
         byte[] pdu = new byte[3];
         short length = 0;
         pdu[0] = (byte) 0b00110011;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testEraseLog(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[3];
+        short length = 0;
+        pdu[0] = (byte) 0b00110100;
         pdu[2] = (byte) (length & 0xff);
         pdu[1] = (byte) ((length >> 8) & 0xff);
         mainActor.tell(new GuardianActor.PDU(pdu));

@@ -99,8 +99,8 @@ public class Log extends AbstractBehavior<Log.Command> {
     }
 
     private Behavior<Command> onErase(EraseLog e) {
-        this.entries.clear();
         int number = this.entries.size();
+        this.entries.clear();
         //TODO: remaining space?
         //for now just use all ones byte
         byte rem = (byte) 0b11111111;
