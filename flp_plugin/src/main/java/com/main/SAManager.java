@@ -326,8 +326,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         //no SA with this spi
         if(saActor == null) {
             byte tag = (byte) 0b00010101;
-            short length = 10;
-            byte[] value = new byte[10];
+            short length = 6;
+            byte[] value = new byte[6];
             value[1] = (byte) (s.sPi & 0xff);
             value[0] = (byte) ((s.sPi >> 8) & 0xff);
             byte[] bytes = ByteBuffer.allocate(4).putInt(s.arcWindow).array();

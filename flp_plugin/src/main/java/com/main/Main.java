@@ -144,6 +144,7 @@ public class Main {
                 testDumpLog(mainActor);
                 Thread.sleep(5000);
                 testInventory(mainActor);*/
+                /*testKeyActivation(mainActor);
                 testStart(mainActor);
                 Thread.sleep(3000);
                 testStatusRequest(mainActor);
@@ -151,6 +152,23 @@ public class Main {
                 testRekey(mainActor);
                 Thread.sleep(6000);
                 testDumpLog(mainActor);
+                Thread.sleep(3000);
+                testStatusRequest(mainActor);
+                Thread.sleep(3000);
+                testStart(mainActor);
+                Thread.sleep(3000);
+                testStatusRequest(mainActor);
+                Thread.sleep(3000);
+                testStop(mainActor);
+                Thread.sleep(3000);
+                testStatusRequest(mainActor);
+                Thread.sleep(3000);
+                testExpire(mainActor);
+                Thread.sleep(3000);
+                testStatusRequest(mainActor);*/
+                testSetARSNWindow(mainActor);
+                Thread.sleep(3000);
+                testReadARSNWindow(mainActor);
                 try {
                     System.out.println(">>> Press ENTER to exit <<<");
                     System.in.read();
@@ -233,6 +251,7 @@ public class Main {
         ByteBuffer bb = ByteBuffer.allocate(2);
         bb.put(byte1);
         bb.put(byte2);
+        //System.out.println(bb.getShort(0));
         return bb.getShort(0);
     }
 
@@ -393,6 +412,18 @@ public class Main {
         pdu[4] = 5;
         mainActor.tell(new GuardianActor.PDU(pdu));
     }
+
+    private static void testStop(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[5];
+        pdu[0] = (byte) 0b00011110;
+        short length = 2;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        pdu[3] = 0;
+        pdu[4] = 5;
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
     private static void testStatusRequest(ActorSystem<GuardianActor.Command> mainActor) {
         byte[] pdu = new byte[5];
         pdu[0] = (byte) 0b00011111;
@@ -400,7 +431,7 @@ public class Main {
         pdu[2] = (byte) (length & 0xff);
         pdu[1] = (byte) ((length >> 8) & 0xff);
         pdu[3] = 0;
-        pdu[4] = 0;
+        pdu[4] = 5;
         mainActor.tell(new GuardianActor.PDU(pdu));
     }
 
@@ -415,6 +446,65 @@ public class Main {
         }
         pdu[4] = 5;
         pdu[5] = 20;
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testExpire(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[5];
+        pdu[0] = (byte) 0b00011001;
+        short length = 2;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        pdu[3] = 0;
+        pdu[4] = 5;
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testSetARSN(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[9];
+        pdu[0] = (byte) 0b00011010;
+        short length = 6;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        pdu[3] = 0;
+        pdu[4] = 0;
+        for(int i = 5; i < pdu.length; i++) {
+            pdu[i] = 1;
+        }
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testReadARSN(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[5];
+        pdu[0] = (byte) 0b00010000;
+        short length = 2;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        pdu[3] = 0;
+        pdu[4] = 0;
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testSetARSNWindow(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[9];
+        pdu[0] = (byte) 0b00010101;
+        short length = 6;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        for(int i = 3; i < pdu.length; i++) {
+            pdu[i] = 0;
+        }
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testReadARSNWindow(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[5];
+        pdu[0] = (byte) 0b01010000;
+        short length = 2;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        pdu[3] = 0;
+        pdu[4] = 0;
         mainActor.tell(new GuardianActor.PDU(pdu));
     }
 }

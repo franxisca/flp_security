@@ -296,11 +296,11 @@ public class Key extends AbstractBehavior<Key.Command> {
     private Behavior<Command> onRekey(CheckRekey c) {
         //keyActor in wrong state
         if(this.keyState != KeyState.ACTIVE) {
-            byte tag = (byte) 0b00000110;
+            byte tag = (byte) 0b00100110;
             short length = 3;
             byte[] value = new byte[3];
-            value[0] = (byte) (c.sPi & 0xff);
-            value[1] = (byte) ((c.sPi >> 8) & 0xff);
+            value[1] = (byte) (c.sPi & 0xff);
+            value[0] = (byte) ((c.sPi >> 8) & 0xff);
             value[2] = this.keyId;
             c.log.tell(new Log.InsertEntry(tag, length, value));
         }

@@ -221,6 +221,8 @@ public class SA extends AbstractBehavior<SA.Command> {
 
     private SA(ActorContext<Command> context, short sPi, int authMaskLength, byte[] authBitMask, boolean critical, byte keyId) {
         super(context);
+        System.out.println("discoverd spi:");
+        System.out.println(sPi);
         this.sPi = sPi;
         this.authBitMask = authBitMask;
         this.authMaskLength = authMaskLength;
@@ -238,8 +240,10 @@ public class SA extends AbstractBehavior<SA.Command> {
        }
        this.aRCWindow = Integer.MAX_VALUE;
        this.iV = new byte[12];
-       this.iV[1] = (byte) (this.sPi & 0xff);
-       this.iV[0] = (byte) ((this.sPi >> 8) & 0xff);
+       this.iV[0] = (byte) (this.sPi >> 8);
+       this.iV[1] = (byte) (this.sPi);
+       /*this.iV[1] = (byte) (this.sPi & 0xff);
+       this.iV[0] = (byte) ((this.sPi >> 8) & 0xff);*/
        for(int i = 2; i < 12; i++) {
            this.iV[i] = 0;
        }
@@ -302,6 +306,9 @@ public class SA extends AbstractBehavior<SA.Command> {
         if(this.state != SAState.UNKEYED) {
             byte tag = (byte) 0b00000110;
             r.log.tell(new Log.InsertEntry(tag, length, value));
+            System.out.println("test spi byte order");
+            System.out.println(value[0]);
+            System.out.println(value[1]);
         }
         else {
             this.keyId = r.keyId;
@@ -370,12 +377,12 @@ public class SA extends AbstractBehavior<SA.Command> {
     private Behavior<Command> onSetARSNWindow(SetARSNWindow s) {
         this.aRCWindow = s.arcWindow;
         byte tag = (byte) 0b10010101;
-        short length = 10;
+        short length = 6;
         byte[] value = new byte[10];
         value[1] = (byte) (this.sPi & 0xff);
         value[0] = (byte) ((this.sPi >> 8) & 0xff);
-        byte[] bytes = ByteBuffer.allocate(8).putLong(s.arcWindow).array();
-        System.arraycopy(bytes, 0, value, 2, 8);
+        byte[] bytes = ByteBuffer.allocate(4).putInt(s.arcWindow).array();
+        System.arraycopy(bytes, 0, value, 2, 4);
         s.log.tell(new Log.InsertEntry(tag, length, value));
         return this;
     }
@@ -430,7 +437,7 @@ public class SA extends AbstractBehavior<SA.Command> {
     private Behavior<Command> onReadARSNWindow(ReadARSNWindow r) {
         byte tag = (byte) 0b11010000;
         short length = 6;
-        byte[] value = new byte[10];
+        byte[] value = new byte[6];
         value[1] = (byte) (this.sPi & 0xff);
         value[0] = (byte) ((this.sPi >> 8) & 0xff);
         byte[] bytes = ByteBuffer.allocate(4).putInt(this.aRCWindow).array();
@@ -452,6 +459,7 @@ public class SA extends AbstractBehavior<SA.Command> {
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
+            this.prevState = this.state;
             this.state = SAState.OPERATIONAL;
             this.channels.add(s.channel);
             s.module.tell(new Module.MapVC(s.channel, this.sPi));

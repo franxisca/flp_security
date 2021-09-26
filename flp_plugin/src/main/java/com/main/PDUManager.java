@@ -112,7 +112,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     //value contains only one SPI but might contain multiple GVC/GMAP ids to add to SA, how is a channel not applicable to SA?
     //ignoring that maybe not applicable
     //channel ids have 32 bit (size of int)
-    //TODO: test
+    //works
     public static final class StartSA implements Command{
         final byte[] value;
         final ActorRef<SAManager.Command> sam;
@@ -129,8 +129,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //should work
-    //TODO: test
+    //works
     public static final class StopSA implements Command {
         final byte[] value;
         final ActorRef<SAManager.Command> replyTo;
@@ -144,7 +143,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //should work
+    //works
     //the same for critical and standard SAs
     public static final class RekeySA implements Command{
         final byte[] value;
@@ -161,7 +160,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //should work
+    //works
     //the same for critical and standard SAs
     public static final class ExpireSA implements Command{
         final byte[] value;
@@ -175,7 +174,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         }
     }
 
-    //should work
+    //works
     public static final class SetARSN implements Command{
         final byte[] value;
         final ActorRef<SAManager.Command> sam;
@@ -189,7 +188,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //should work
+    //works
     public static final class SetARSNWindow implements Command {
         final byte[] value;
         final ActorRef<SAManager.Command> sam;
@@ -220,7 +219,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //should work
+    //works
     public static final class ReadARSN implements Command {
         final byte[] value;
         final ActorRef<SAManager.Command> sam;
@@ -236,6 +235,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
+    //works
     public static final class ReadARSNWindow implements Command {
         final byte[] value;
         final ActorRef<SAManager.Command> sam;
@@ -250,7 +250,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         }
     }
 
-    //should work
+    //works
     public static final class Ping implements Command {
 
         //value is empty for ping, maybe not pass it
@@ -264,7 +264,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //should work
+    //works
     public static final class DumpLog implements Command {
         final ActorRef<SecurityManager.Command> replyTo;
         final ActorRef<Log.Command> log;
@@ -277,6 +277,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     //should work
+    //TODO: test
     public static final class EraseLog implements Command {
         final ActorRef<SecurityManager.Command> replyTo;
         final ActorRef<Log.Command> log;
@@ -509,6 +510,8 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         bb.put(r.value[0]);
         bb.put(r.value[1]);
         short sPi = bb.getShort(0);
+        /*System.out.println("test spi on rekey");
+        System.out.println(sPi);*/
         byte keyId = r.value[2];
         byte[] arc = new byte[4];
         byte[] iv = new byte[12];
@@ -543,7 +546,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         short sPi = bb.getShort(0);
         byte[] arc = new byte[4];
         int j = 0;
-        for (int i = 3; i < 7; i++) {
+        for (int i = 2; i < 6; i++) {
             arc[j] = s.value[i];
             j++;
         }
@@ -619,9 +622,9 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     private Behavior<Command> onReadARSNWindowReply(ReadARSNWindowReply r) {
         byte tag = (byte) 0b11010000;
-        short length = 10;
+        short length = 6;
         //2 byte sPi, 4 byte arcWindow
-        byte[] value = new byte[10];
+        byte[] value = new byte[6];
         value[1] = (byte) (r.sPi & 0xff);
         value[0] = (byte) ((r.sPi >> 8) & 0xff);
         byte[] bytes = ByteBuffer.allocate(4).putInt(r.arcWindow).array();
@@ -707,7 +710,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     private Behavior<Command> onDumpLogReply(DumpLogReply d) {
-        byte[] reply = new byte[d.value.length + 3];
+        //byte[] reply = new byte[d.value.length + 3];
         byte tag = (byte) 0b10110011;
         short length = (short) d.value.length;
         /*reply[0] = tag;

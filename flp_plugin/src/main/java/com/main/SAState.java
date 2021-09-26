@@ -59,6 +59,9 @@ public enum SAState {
                     case KEYED: {
                         return (byte) 0b00010010;
                     }
+                    case OPERATIONAL: {
+                        return (byte) 0b00010001;
+                    }
                     default: {
                         return (byte) 0b11111111;
                     }

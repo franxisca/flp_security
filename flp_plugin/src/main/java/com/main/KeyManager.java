@@ -446,6 +446,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             r.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
+            //System.out.println("got to key check on rekey");
             keyActor.tell(new Key.CheckRekey(r.sPi, r.arc, r.iv, r.log, r.sam));
         }
         return this;
