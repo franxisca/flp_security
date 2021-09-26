@@ -12,6 +12,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.BitSet;
 
 public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
@@ -85,27 +86,10 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
     }
 
     private Behavior<Command> onRaw(RawTM tm) {
-        BitSet header = BitSet.valueOf(tm.frameHeader);
-        BitSet vc = header.get(12, 15);
-        BitSet vcId = new BitSet(8);
-        for(int i = 0; i < 5; i++) {
-            vcId.clear(i);
-        }
-        int j = 0;
-        for(int i = 5; i < 8; i++) {
-            if (vc.get(j)) {
-                vcId.set(i);
-            }
-            j++;
-        }
-        //is one byte long
-        byte[] bytes = vcId.toByteArray();
-        byte[] byVc = new byte[4];
-        byVc[0] = 0;
-        byVc[1] = 0;
-        byVc[2] = 0;
-        System.arraycopy(bytes, 0, byVc, 3, 1);
-        int channelInt = ByteBuffer.wrap(byVc).getInt();
+        byte headerByte = tm.frameHeader[1];
+        byte vcBits = (byte) (headerByte & 0b00001110);
+        byte vcShift = (byte) (vcBits >> 1);
+        int channelInt = (int) vcShift;
         this.parent.tell(new Module.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, channelInt, getContext().getSelf()));
         return this;
     }
@@ -156,6 +140,7 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
         return this;
     }
 
+    //TODO: check for tag length
     private static byte[] encrypt(byte[] key, byte[] iv, byte[] data) throws Exception {
 
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");

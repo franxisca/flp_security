@@ -283,13 +283,15 @@ public class Module extends AbstractBehavior<Module.Command> {
     }
 
     private Behavior<Command> onTM (GetTMInfo tm) {
-        short sPi = this.vcIdToSA.get(tm.channel);
+        System.out.println("channel id to get default SA");
+        System.out.println(tm.channel);
         //no SA active on this channel, use default SA
         if(!this.vcIdToSA.containsKey(tm.channel)) {
-            sPi = this.vcIdToDefaultSA.get(tm.channel);
+            short sPi = this.vcIdToDefaultSA.get(tm.channel);
             this.secMan.tell(new SecurityManager.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc, sPi));
         }
         else {
+            short sPi = this.vcIdToSA.get(tm.channel);
             this.secMan.tell(new SecurityManager.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc, sPi));
             //saActor.tell(new SA.GetTMInfo(tm.frameHeader, tm.data, tm.trailer, tm.channel, tm.tmProc));
         }
@@ -333,13 +335,16 @@ public class Module extends AbstractBehavior<Module.Command> {
         System.arraycopy(tm.tm, 0, frameHeader, 0, 6);
         System.arraycopy(tm.tm, 6, data, 0, 1105);
         System.arraycopy(tm.tm, 1111, trailer, 0, 4);
+        System.out.println("tm frame header test");
+        System.out.println(Arrays.toString(frameHeader));
         this.tmProc.tell(new TMProcessor.RawTM(frameHeader, data, trailer));
         return this;
     }
 
     private Behavior<Command> onTMOut(ReturnTM tm) {
         //TODO
-        System.out.println(tm.tm);
+        System.out.println(Arrays.toString(tm.tm));
+        System.out.println(tm.tm.length);
         //this.tmOut.tell(new TMOutStream.TM(tm.tm));
         return this;
     }

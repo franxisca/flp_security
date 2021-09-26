@@ -76,6 +76,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     //should work
+    //TODO: spec says answer shall contain 2 bytes keyid, 2 bytes truncated MAC of 128 bit length
     public static final class KeyVerification implements Command{
         final byte[] value;
         final ActorRef<KeyManager.Command> replyTo;

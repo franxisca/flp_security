@@ -16,6 +16,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+
 public class Main {
 
     private static final int OTAR_IV_LENGTH = 12;
@@ -107,7 +108,7 @@ public class Main {
                     ByteBuffer bb = ByteBuffer.allocate(2);
                     bb.put(lenArray[0]);
                     bb.put(lenArray[1]);
-                    short finLength = bb.getShort(0);
+                    short finLength = bb.getShort(0) + 1;
                     byte[] tc = new byte[finLength];
                     System.arraycopy(frameHeader, 0, tc, 0, frameHeader.length);
                     //TODO: assumes TC frame length includes header and trailer
@@ -180,11 +181,12 @@ public class Main {
                 Thread.sleep(3000);
                 testEraseLog(mainActor);*/
                 //testVerification(mainActor);
-                testOtar(mainActor);
+                /*testOtar(mainActor);
                 Thread.sleep(3000);
                 testInventory(mainActor);
                 Thread.sleep(3000);
-                testDumpLog(mainActor);
+                testDumpLog(mainActor);*/
+                testTM(mainActor);
                 try {
                     System.out.println(">>> Press ENTER to exit <<<");
                     System.in.read();
@@ -620,5 +622,66 @@ public class Main {
         pdu[4] = 0;
         pdu[5] = 0;
         mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testTM(ActorSystem<GuardianActor.Command> mainActor) {
+        /*try {
+            System.out.println("test scanning tm");
+            Scanner scanner = new Scanner(new File("TM_log.txt"));
+            int i = 0;
+            byte[] tm = new byte[1115];
+            while(scanner.hasNextLine() && i < 1115) {
+                String s = scanner.nextLine();
+                String[] tokens = s.split("\\s");
+                String[] tokCut = new String[tokens.length - 2];
+                System.arraycopy(tokens, 1, tokCut, 0, tokens.length - 2);
+                byte[] bytes = DataTypeConverter.parse
+                //System.out.println(scanner.nextByte());
+                i++;
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }*/
+        byte[] tm = new byte[1115];
+        tm[0] = 0x00;
+        tm[1] = 0x00;
+        tm[2] = 0x04;
+        tm[3] = 0x6f;
+        tm[4] = 0x02;
+        tm[5] = 0x5d;
+        tm[6] = 0x00;
+        tm[7] = 0x00;
+        tm[8] = 0x00;
+        tm[9] = 0x00;
+        tm[10] = 0x07;
+        tm[11] = 0x72;
+        tm[12] = 0x08;
+        tm[13] = (byte) 0xC0;
+        tm[14] = (byte) 0xfe;
+        tm[15] = 0x14;
+        tm[16] = 0x5a;
+        tm[17] = 0x00;
+        tm[18] = 0x00;
+        tm[19] = 0x00;
+        tm[20] = 0x25;
+        tm[21] = (byte) 0xd0;
+        tm[22] = 0x00;
+        tm[23] = 0x00;
+        tm[24] = 0x18;
+        tm[25] = 0x00;
+        tm[26] = 0x07;
+        tm[27] = (byte) 0xff;
+        tm[28] = (byte) 0xc0;
+        tm[29] = 0x00;
+        tm[30] = 0x03;
+        tm[31] = (byte) 0xf7;
+        for(int i = 32; i < tm.length; i++) {
+            tm[i] = 0x00;
+        }
+        mainActor.tell(new GuardianActor.TM(tm));
+        for(int i = 0; i < 32; i++) {
+            System.out.println(tm[i]);
+        }
     }
 }
