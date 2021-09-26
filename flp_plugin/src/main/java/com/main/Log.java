@@ -85,6 +85,7 @@ public class Log extends AbstractBehavior<Log.Command> {
             result.add(i.tag);
             result.add((byte) (i.length & 0xff));
             result.add((byte) ((i.length >> 8) & 0xff));
+            //result.add((byte) (i.length & 0xff));
             for (int j = 0; j < i.value.length; j++) {
                 result.add(i.value[j]);
             }

@@ -19,6 +19,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     public interface Command {}
 
 
+    //works
     public static final class KeyDestruction implements Command {
 
        final byte[] value;
@@ -35,6 +36,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     //SecurityManager needs to pass reference to KeyManager when issuing otar to PDUManager
     //should work
+    //TODO: test
     public static final class Otar implements Command {
         //final byte[] length;
         final byte[] value;
@@ -48,7 +50,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         }
     }
 
-    //should work
+    //works
     public static final class KeyActivation implements Command {
         final byte[] value;
         final ActorRef<KeyManager.Command> replyTo;
@@ -61,7 +63,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         }
     }
 
-    //should work
+    //works
     public static final class KeyDeactivation implements Command {
         final byte[] value;
         final ActorRef<KeyManager.Command> replyTo;
@@ -75,6 +77,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     //should work
+    //TODO: test
     public static final class KeyVerification implements Command{
         final byte[] value;
         final ActorRef<KeyManager.Command> replyTo;
@@ -90,7 +93,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     //reply required
-    //i think it works?
+    //works
     public static final class KeyInventory implements Command {
         final byte[] value;
         final ActorRef<KeyManager.Command> keyMan;
@@ -109,6 +112,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     //value contains only one SPI but might contain multiple GVC/GMAP ids to add to SA, how is a channel not applicable to SA?
     //ignoring that maybe not applicable
     //channel ids have 32 bit (size of int)
+    //TODO: test
     public static final class StartSA implements Command{
         final byte[] value;
         final ActorRef<SAManager.Command> sam;
@@ -126,6 +130,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     //should work
+    //TODO: test
     public static final class StopSA implements Command {
         final byte[] value;
         final ActorRef<SAManager.Command> replyTo;
@@ -198,7 +203,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     }
 
-    //should work
+    //works
     public static final class SAStatusRequest implements Command {
         final byte[] value;
         final ActorRef<SAManager.Command> sam;
@@ -575,8 +580,8 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         byte tag = (byte) 0b10011111;
         short length = 3;
         byte[] value = new byte[3];
-        value[0] = (byte) (s.sPi & 0xff);
-        value[1] = (byte) ((s.sPi >> 8) & 0xff);
+        value[1] = (byte) (s.sPi & 0xff);
+        value[0] = (byte) ((s.sPi >> 8) & 0xff);
         value[2] = s.trans;
         s.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
         return this;
@@ -596,8 +601,8 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         short length = 6;
         //2 byte spi, 4 byte arc
         byte[] value = new byte[6];
-        value[0] = (byte) (r.sPi & 0xff);
-        value[1] = (byte) ((r.sPi >> 8) & 0xff);
+        value[1] = (byte) (r.sPi & 0xff);
+        value[0] = (byte) ((r.sPi >> 8) & 0xff);
         System.arraycopy(r.arc, 0, value, 2, 4);
         r.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
         return this;
@@ -617,8 +622,8 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         short length = 10;
         //2 byte sPi, 4 byte arcWindow
         byte[] value = new byte[10];
-        value[0] = (byte) (r.sPi & 0xff);
-        value[1] = (byte) ((r.sPi >> 8) & 0xff);
+        value[1] = (byte) (r.sPi & 0xff);
+        value[0] = (byte) ((r.sPi >> 8) & 0xff);
         byte[] bytes = ByteBuffer.allocate(4).putInt(r.arcWindow).array();
         System.arraycopy(bytes, 0, value, 2, 4);
         r.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
@@ -635,6 +640,9 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     private Behavior<Command> onInventory(KeyInventory k){
         byte firstKey = k.value[0];
         byte lastKey = k.value[1];
+        System.out.println("test key inventory values");
+        System.out.println(firstKey);
+        System.out.println(lastKey);
         Map<Byte, KeyState> reply = new HashMap<>();
         k.keyMan.tell(new KeyManager.KeyInventory(firstKey, lastKey, k.log, getContext().getSelf(), k.secMan, (short) 0, reply, firstKey));
         return this;
@@ -667,17 +675,23 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         //length is size of map times 1 (for keyId) + (number of bytes required for keyState (here assuming 1) + 2(for number of keys field)
         short length = (short) ((k.keyIdToState.size() * 2) + 2);
         byte[] value = new byte[length];
-        value[0] = (byte) (k.number & 0xff);
-        value[1] = (byte) ((k.number >> 8) & 0xff);
-        int j = 0;
-        Iterator it = k.keyIdToState.entrySet().iterator();
+        value[1] = (byte) (k.number & 0xff);
+        value[0] = (byte) ((k.number >> 8) & 0xff);
+        int j = 2;
+        //Iterator it = k.keyIdToState.entrySet().iterator();
         //if something doesn't work check condition in for loop
-        for (int i = 2; i < (2 * k.keyIdToState.size() + 2) && it.hasNext(); i = i+2)
+        for(Map.Entry<Byte, KeyState> entry : k.keyIdToState.entrySet()) {
+            value[j] = entry.getKey();
+            j++;
+            value[j] = entry.getValue().toByte();
+            j++;
+        }
+        /*for (int i = 2; i < (2 * k.keyIdToState.size() + 2) && it.hasNext(); i = i+2)
         {
             Map.Entry<Byte, KeyState> pair = (Map.Entry) it.next();
             value[i] = pair.getKey();
             value[i+1] = pair.getValue().toByte();
-        }
+        }*/
         k.replyTo.tell(new SecurityManager.PDUReply(tag, length, value));
         return this;
     }

@@ -258,8 +258,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             byte tag = (byte) 0b00011110;
             short length = 2;
             byte[] value = new byte[2];
-            value[0] = (byte) (s.sPi & 0xff);
-            value[1] = (byte) ((s.sPi >> 8) & 0xff);
+            value[1] = (byte) (s.sPi & 0xff);
+            value[0] = (byte) ((s.sPi >> 8) & 0xff);
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
@@ -275,8 +275,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             byte tag = (byte) 0b00110110;
             short length = 3;
             byte[] value = new byte[3];
-            value[0] = (byte) (r.sPi & 0xff);
-            value[1] = (byte) ((r.sPi >> 8) & 0xff);
+            value[1] = (byte) (r.sPi & 0xff);
+            value[0] = (byte) ((r.sPi >> 8) & 0xff);
             value[2] = r.keyId;
             r.log.tell(new Log.InsertEntry(tag, length, value));
         }
@@ -293,8 +293,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             byte tag = (byte) 0b00011001;
             short length = 2;
             byte[] value = new byte[2];
-            value[0] = (byte) (e.sPi & 0xff);
-            value[1] = (byte) ((e.sPi >> 8) & 0xff);
+            value[1] = (byte) (e.sPi & 0xff);
+            value[0] = (byte) ((e.sPi >> 8) & 0xff);
             e.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
@@ -310,8 +310,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             byte tag = (byte) 0b00011010;
             short length = 6;
             byte[] value = new byte[6];
-            value[0] = (byte) (s.sPi & 0xff);
-            value[1] = (byte) ((s.sPi >> 8) & 0xff);
+            value[1] = (byte) (s.sPi & 0xff);
+            value[0] = (byte) ((s.sPi >> 8) & 0xff);
             System.arraycopy(s.arc, 0, value, 2, 4);
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
@@ -328,8 +328,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             byte tag = (byte) 0b00010101;
             short length = 10;
             byte[] value = new byte[10];
-            value[0] = (byte) (s.sPi & 0xff);
-            value[1] = (byte) ((s.sPi >> 8) & 0xff);
+            value[1] = (byte) (s.sPi & 0xff);
+            value[0] = (byte) ((s.sPi >> 8) & 0xff);
             byte[] bytes = ByteBuffer.allocate(4).putInt(s.arcWindow).array();
             System.arraycopy(bytes, 0, value, 2, 4);
             s.log.tell(new Log.InsertEntry(tag, length, value));
@@ -347,8 +347,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             byte tag = (byte) 0b00011111;
             short length = 2;
             byte[] value = new byte[2];
-            value[0] = (byte) (s.sPi & 0xff);
-            value[1] = (byte) ((s.sPi >> 8) & 0xff);
+            value[1] = (byte) (s.sPi & 0xff);
+            value[0] = (byte) ((s.sPi >> 8) & 0xff);
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
@@ -364,8 +364,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             byte tag = (byte) 0b00010000;
             short length = 2;
             byte[] value = new byte[2];
-            value[0] = (byte) (r.sPi & 0xff);
-            value[1] = (byte) ((r.sPi >> 8) & 0xff);
+            value[1] = (byte) (r.sPi & 0xff);
+            value[0] = (byte) ((r.sPi >> 8) & 0xff);
             r.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
@@ -381,8 +381,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             byte tag = (byte) 0b01010000;
             short length = 2;
             byte[] value = new byte[2];
-            value[0] = (byte) (r.sPi & 0xff);
-            value[1] = (byte) ((r.sPi >> 8) & 0xff);
+            value[1] = (byte) (r.sPi & 0xff);
+            value[0] = (byte) ((r.sPi >> 8) & 0xff);
             r.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
@@ -398,8 +398,8 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
             byte tag = (byte) 0b00011011;
             short length = 5;
             byte[] value = new byte[5];
-            value[0] = (byte) (s.sPi & 0xff);
-            value[1] = (byte) ((s.sPi >> 8) & 0xff);
+            value[1] = (byte) (s.sPi & 0xff);
+            value[0] = (byte) ((s.sPi >> 8) & 0xff);
             byte[] bytes = ByteBuffer.allocate(4).putInt(s.channel).array();
             System.arraycopy(bytes, 0, value, 2, 4);
             s.log.tell(new Log.InsertEntry(tag, length, value));

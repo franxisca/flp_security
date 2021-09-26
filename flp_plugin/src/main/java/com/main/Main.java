@@ -2,6 +2,7 @@ package com.main;
 
 /*import akka.actor.ActorRef;
 import akka.actor.ActorSystem;*/
+import akka.actor.ActorContext;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.ActorSystem;
 
@@ -40,7 +41,7 @@ public class Main {
         Socket pduOut = null;
 
         try {
-            tmIn = new Socket(hostName, portSendUnprotectedTM);
+            /*tmIn = new Socket(hostName, portSendUnprotectedTM);
             tcIn = new Socket(hostName, portSendProtectedTC);
             pduIn = new Socket(hostName, portSendEPCommand);
             InputStream tmInstream = tmIn.getInputStream();
@@ -52,7 +53,7 @@ public class Main {
             pduOut = new Socket(hostName, portReceiveEPReply);
             OutputStream tmOutStream = tmOut.getOutputStream();
             OutputStream tcOutStream = tcOut.getOutputStream();
-            OutputStream pduOutStream = pduOut.getOutputStream();
+            OutputStream pduOutStream = pduOut.getOutputStream();*/
 
             final ActorSystem<GuardianActor.Command> mainActor = ActorSystem.create(GuardianActor.create(), "guardian-actor");
             int active = 50;
@@ -61,11 +62,13 @@ public class Main {
             Map<Integer, Short> vcToSA = getVC();
             Map<Short, Byte> criticalSA = criticalSAs();
             List<Short> standardSA = standardSAs();
-            mainActor.tell(new GuardianActor.Start(active, masterKeys, sessionKeys, vcToSA, criticalSA, standardSA, tmOutStream, tcOutStream, pduOutStream));
+            //TODO
+            mainActor.tell(new GuardianActor.Start(active, masterKeys, sessionKeys, vcToSA, criticalSA, standardSA, null, null, null));
             try {
                 //TODO: maybe find a different solution than timeout until initialization is finished
                 Thread.sleep(5000);
-                Scanner tmScanner = new Scanner(new InputStreamReader(tmInstream));
+                //TODO
+                /*Scanner tmScanner = new Scanner(new InputStreamReader(tmInstream));
                 Scanner tcScanner = new Scanner(new InputStreamReader(tcInstream));
                 Scanner pduScanner = new Scanner(new InputStreamReader(pduInstream));
                 while(tmScanner.hasNextByte()) {
@@ -124,14 +127,30 @@ public class Main {
                         pdu[i] = pduScanner.nextByte();
                     }
                     mainActor.tell(new GuardianActor.PDU(pdu));
-                }
+                }*/
                 //from here: testing of ping
-                byte[] pdu = new byte[3];
+                /*byte[] pdu = new byte[3];
                 pdu[0] = (byte) 0b00110001;
                 short length = 0;
                 pdu[1] = (byte) (length & 0xff);
                 pdu[2] = (byte) ((length >> 8) & 0xff);
                 mainActor.tell(new GuardianActor.PDU(pdu));
+                testKeyDestruction(mainActor);
+                testKeyActivation(mainActor);
+                testKeyDeactivation(mainActor);
+                //Thread.sleep(3000);
+                //testKeyDestruction(mainActor);
+                Thread.sleep(5000);
+                testDumpLog(mainActor);
+                Thread.sleep(5000);
+                testInventory(mainActor);*/
+                testStart(mainActor);
+                Thread.sleep(3000);
+                testStatusRequest(mainActor);
+                Thread.sleep(3000);
+                testRekey(mainActor);
+                Thread.sleep(6000);
+                testDumpLog(mainActor);
                 try {
                     System.out.println(">>> Press ENTER to exit <<<");
                     System.in.read();
@@ -143,7 +162,8 @@ public class Main {
                 e.printStackTrace();
             }
         }
-        catch (UnknownHostException e) {
+        catch (Exception e){e.printStackTrace();}
+        /*catch (UnknownHostException e) {
             System.out.println("Unknown Host...");
             e.printStackTrace();
         }
@@ -206,7 +226,7 @@ public class Main {
                     e.printStackTrace();
                 }
             }
-        }
+        }*/
     }
 
     private static short getShort(byte byte1, byte byte2) {
@@ -288,5 +308,113 @@ public class Main {
         temp.add(getShort((byte) 0b00000000, (byte) 0b00000101));
         temp.add(getShort((byte) 0b00000000, (byte) 0b00000111));
         return temp;
+    }
+
+    private void testPing(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[3];
+        pdu[0] = (byte) 0b00110001;
+        short length = 0;
+        pdu[1] = (byte) (length & 0xff);
+        pdu[2] = (byte) ((length >> 8) & 0xff);
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+   //TODO
+    private void testOtar(ActorSystem<GuardianActor.Command> mainActor) {
+        //byte[] pdu = new byte[3 + ]
+    }
+
+    //TODO: correct all my bitshifts (the least significant byte of short is retrieved first not the other way around)
+
+    private static void testKeyActivation(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[5];
+        pdu[0] = (byte) 0b00000010;
+        short length = 2;
+        pdu[2] = (byte) (length & 0xff);
+        /*System.out.println("byte one of length");
+        System.out.println(pdu[1]);*/
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        /*System.out.println("byte two of length");
+        System.out.println(pdu[2]);*/
+        pdu[3] = (byte) 0b00010100;
+        pdu[4] = (byte) 0b00010101;
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testKeyDeactivation(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[4];
+        pdu[0] = (byte) 0b00000011;
+        short length = 1;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        pdu[3] =  (byte) 0b0010100;
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testKeyDestruction(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[4];
+        pdu[0] = (byte) 0b00000110;
+        short length = 1;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        pdu[3] = (byte) 0b0010100;
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testDumpLog(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[3];
+        short length = 0;
+        pdu[0] = (byte) 0b00110011;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testInventory(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[5];
+        pdu[0] = (byte) 0b00000111;
+        short length = 2;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        pdu[3] = 0;
+        pdu[4] = 39;
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testStart(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[9];
+        pdu[0] = (byte) 0b00011011;
+        short length = 6;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        for(int i = 3; i < pdu.length; i++) {
+            pdu[i] = 0;
+        }
+        pdu[4] = 5;
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+    private static void testStatusRequest(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[5];
+        pdu[0] = (byte) 0b00011111;
+        short length = 2;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        pdu[3] = 0;
+        pdu[4] = 0;
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testRekey(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[1+2+2+1+4+12];
+        pdu[0] = (byte) 0b00010110;
+        short length = 19;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        for(int i = 3; i < pdu.length; i++) {
+            pdu[i] = 0;
+        }
+        pdu[4] = 5;
+        pdu[5] = 20;
+        mainActor.tell(new GuardianActor.PDU(pdu));
     }
 }

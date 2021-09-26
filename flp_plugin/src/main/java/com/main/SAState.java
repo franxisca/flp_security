@@ -32,6 +32,9 @@ public enum SAState {
     }
 
     public byte transition (SAState state1, SAState state2) {
+        if(state1 == null) {
+            state1 = NAN;
+        }
         switch (state1) {
             case POWERED_OFF: {
                 switch (state2) {

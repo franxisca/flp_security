@@ -266,8 +266,8 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onPDUout(PDUOut p) {
         //TODO
-        //System.out.println(Arrays.toString(p.pdu));
-        this.pduOut.tell(new PDUOutstream.PDU(p.pdu));
+        System.out.println(Arrays.toString(p.pdu));
+        //this.pduOut.tell(new PDUOutstream.PDU(p.pdu));
         return this;
     }
 
@@ -321,8 +321,8 @@ public class Module extends AbstractBehavior<Module.Command> {
         //TODO
         System.out.println(tc.verificationStatus);
         System.out.println(tc.verStatCode);
-        //System.out.println(tc.secReturn);
-        this.tcOut.tell(new TCOutstream.TC(tc.secReturn));
+        System.out.println(tc.secReturn);
+        //this.tcOut.tell(new TCOutstream.TC(tc.secReturn));
         return this;
     }
 
@@ -339,8 +339,8 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onTMOut(ReturnTM tm) {
         //TODO
-        //System.out.println(tm.tm);
-        this.tmOut.tell(new TMOutStream.TM(tm.tm));
+        System.out.println(tm.tm);
+        //this.tmOut.tell(new TMOutStream.TM(tm.tm));
         return this;
     }
 

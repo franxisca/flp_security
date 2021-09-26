@@ -218,9 +218,14 @@ public class Key extends AbstractBehavior<Key.Command> {
         super(context);
         this.keyId = keyId;
         this.key = key;
-        this.keyState = KeyState.POWERED_OFF;
+        if(startUp) {
+            this.keyState = KeyState.ACTIVE;
+        }
+        else {
+            this.keyState = KeyState.PRE_ACTIVE;
+        }
         this.master = startUp;
-        context.getLog().info("Key with ID {} initialized", keyId);
+        //context.getLog().info("Key with ID {} initialized", keyId);
     }
 
     @Override
@@ -259,6 +264,8 @@ public class Key extends AbstractBehavior<Key.Command> {
             byte tag = (byte) 0b10000010;
             this.keyState = KeyState.ACTIVE;
             a.log.tell(new Log.InsertEntry(tag,length, value));
+            System.out.println("key activation successful " + this.keyId);
+            //System.out.println(this.keyId);
         }
         return this;
     }
@@ -281,6 +288,7 @@ public class Key extends AbstractBehavior<Key.Command> {
             byte tag = (byte) 0b10000011;
             this.keyState = KeyState.DEACTIVATED;
             d.log.tell(new Log.InsertEntry(tag, length, value));
+            System.out.println("key deactivation successful " + this.keyId);
         }
         return this;
     }
@@ -304,6 +312,7 @@ public class Key extends AbstractBehavior<Key.Command> {
 
     private Behavior<Command> onInventory(KeyInventory k) {
         k.keyIdToState.put(this.keyId, this.keyState);
+        //byte curr = k.currKey++;
         k.keyMan.tell(new KeyManager.KeyInventory(k.firstKey, k.lastKey, k.log, k.pum, k.secMan, k.number, k.keyIdToState, k.currKey));
         return this;
     }

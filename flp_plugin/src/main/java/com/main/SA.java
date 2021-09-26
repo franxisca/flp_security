@@ -193,7 +193,7 @@ public class SA extends AbstractBehavior<SA.Command> {
     private SAState prevState;
     //maybe there are multiple channels
     //private ArrayList<Integer> channels;
-    private ArrayList<Integer> channels;
+    private ArrayList<Integer> channels = new ArrayList<>();
     //private long channelId;
     private final boolean critical;
 
@@ -238,8 +238,8 @@ public class SA extends AbstractBehavior<SA.Command> {
        }
        this.aRCWindow = Integer.MAX_VALUE;
        this.iV = new byte[12];
-       this.iV[0] = (byte) (this.sPi & 0xff);
-       this.iV[1] = (byte) ((this.sPi >> 8) & 0xff);
+       this.iV[1] = (byte) (this.sPi & 0xff);
+       this.iV[0] = (byte) ((this.sPi >> 8) & 0xff);
        for(int i = 2; i < 12; i++) {
            this.iV[i] = 0;
        }
@@ -271,8 +271,8 @@ public class SA extends AbstractBehavior<SA.Command> {
             byte tag = (byte) 0b00101110;
             short length = 2;
             byte[] value = new byte[2];
-            value[0] = (byte) (this.sPi & 0xff);
-            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            value[1] = (byte) (this.sPi & 0xff);
+            value[0] = (byte) ((this.sPi >> 8) & 0xff);
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
@@ -282,8 +282,8 @@ public class SA extends AbstractBehavior<SA.Command> {
             byte tag = (byte) 0b10011110;
             short length = 2;
             byte[] value = new byte[2];
-            value[0] = (byte) (this.sPi & 0xff);
-            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            value[1] = (byte) (this.sPi & 0xff);
+            value[0] = (byte) ((this.sPi >> 8) & 0xff);
             s.log.tell(new Log.InsertEntry(tag, length, value));
         }
         return this;
@@ -295,8 +295,8 @@ public class SA extends AbstractBehavior<SA.Command> {
 
         short length = 3;
         byte[] value = new byte[3];
-        value[0] = (byte) (this.sPi & 0xff);
-        value[1] = (byte) ((this.sPi >> 8) & 0xff);
+        value[1] = (byte) (this.sPi & 0xff);
+        value[0] = (byte) ((this.sPi >> 8) & 0xff);
         value[2] = r.keyId;
         //if SA in wrong state to be rekeyed log that
         if(this.state != SAState.UNKEYED) {
@@ -323,8 +323,8 @@ public class SA extends AbstractBehavior<SA.Command> {
     private Behavior<Command> onExpire(Expire e) {
         short length = 2;
         byte[] value = new byte[2];
-        value[0] = (byte) (this.sPi & 0xff);
-        value[1] = (byte) ((this.sPi >> 8) & 0xff);
+        value[1] = (byte) (this.sPi & 0xff);
+        value[0] = (byte) ((this.sPi >> 8) & 0xff);
         //SA not in the right state
         if(this.state != SAState.KEYED) {
             byte tag = (byte) 0b00101001;
@@ -345,8 +345,8 @@ public class SA extends AbstractBehavior<SA.Command> {
     private Behavior<Command> onSetARSN(SetARSN s) {
         short length = 6;
         byte[] value = new byte[6];
-        value[0] = (byte) (this.sPi & 0xff);
-        value[1] = (byte) ((this.sPi >> 8) & 0xff);
+        value[1] = (byte) (this.sPi & 0xff);
+        value[0] = (byte) ((this.sPi >> 8) & 0xff);
         System.arraycopy(s.arc, 0, value, 2, 4);
         //maybe check if that is a valid value according to ARSNWindow?
         ByteBuffer bb = ByteBuffer.allocate(4);
@@ -372,8 +372,8 @@ public class SA extends AbstractBehavior<SA.Command> {
         byte tag = (byte) 0b10010101;
         short length = 10;
         byte[] value = new byte[10];
-        value[0] = (byte) (this.sPi & 0xff);
-        value[1] = (byte) ((this.sPi >> 8) & 0xff);
+        value[1] = (byte) (this.sPi & 0xff);
+        value[0] = (byte) ((this.sPi >> 8) & 0xff);
         byte[] bytes = ByteBuffer.allocate(8).putLong(s.arcWindow).array();
         System.arraycopy(bytes, 0, value, 2, 8);
         s.log.tell(new Log.InsertEntry(tag, length, value));
@@ -383,12 +383,12 @@ public class SA extends AbstractBehavior<SA.Command> {
     private Behavior<Command> onStatusRequest(StatusRequest s) {
         SAState[] trans;
         byte transition;
-        if (this.prevState != SAState.NAN) {
+        if (this.prevState != SAState.NAN && this.prevState != null) {
             byte tag = (byte) 0b10011111;
             short length = 4;
             byte[] value = new byte[4];
-            value[0] = (byte) (this.sPi & 0xff);
-            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            value[1] = (byte) (this.sPi & 0xff);
+            value[0] = (byte) ((this.sPi >> 8) & 0xff);
             value[2] = this.prevState.toByte();
             value[3] = this.state.toByte();
             trans = new SAState[2];
@@ -401,8 +401,8 @@ public class SA extends AbstractBehavior<SA.Command> {
             byte tag = (byte) 0b10101111;
             short length = 3;
             byte[] value = new byte[3];
-            value[0] = (byte) (this.sPi & 0xff);
-            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            value[1] = (byte) (this.sPi & 0xff);
+            value[0] = (byte) ((this.sPi >> 8) & 0xff);
             value[2] = this.state.toByte();
             trans = new SAState[2];
             trans[0] = this.prevState;
@@ -419,8 +419,8 @@ public class SA extends AbstractBehavior<SA.Command> {
         byte tag = (byte) 0b10010000;
         short length = 6;
         byte[] value = new byte[6];
-        value[0] = (byte) (this.sPi & 0xff);
-        value[1] = (byte) ((this.sPi >> 8) & 0xff);
+        value[1] = (byte) (this.sPi & 0xff);
+        value[0] = (byte) ((this.sPi >> 8) & 0xff);
         System.arraycopy(this.aRC, 0, value, 2, 4);
         r.log.tell(new Log.InsertEntry(tag, length, value));
         r.replyTo.tell(new PDUManager.ReadARSNReply(this.sPi, this.aRC, r.secMan));
@@ -431,8 +431,8 @@ public class SA extends AbstractBehavior<SA.Command> {
         byte tag = (byte) 0b11010000;
         short length = 6;
         byte[] value = new byte[10];
-        value[0] = (byte) (this.sPi & 0xff);
-        value[1] = (byte) ((this.sPi >> 8) & 0xff);
+        value[1] = (byte) (this.sPi & 0xff);
+        value[0] = (byte) ((this.sPi >> 8) & 0xff);
         byte[] bytes = ByteBuffer.allocate(4).putInt(this.aRCWindow).array();
         System.arraycopy(bytes, 0, value, 2, 4);
         r.log.tell(new Log.InsertEntry(tag, length, value));
@@ -445,8 +445,8 @@ public class SA extends AbstractBehavior<SA.Command> {
             byte tag = (byte) 0b00101011;
             short length = 6;
             byte[] value = new byte[6];
-            value[0] = (byte) (this.sPi & 0xff);
-            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            value[1] = (byte) (this.sPi & 0xff);
+            value[0] = (byte) ((this.sPi >> 8) & 0xff);
             byte[] bytes = ByteBuffer.allocate(4).putInt(s.channel).array();
             System.arraycopy(bytes, 0, value, 2, 4);
             s.log.tell(new Log.InsertEntry(tag, length, value));
@@ -458,8 +458,8 @@ public class SA extends AbstractBehavior<SA.Command> {
             byte tag = (byte) 0b10011011;
             short length = 6;
             byte[] value = new byte[6];
-            value[0] = (byte) (this.sPi & 0xff);
-            value[1] = (byte) ((this.sPi >> 8) & 0xff);
+            value[1] = (byte) (this.sPi & 0xff);
+            value[0] = (byte) ((this.sPi >> 8) & 0xff);
             byte[] bytes = ByteBuffer.allocate(4).putInt(s.channel).array();
             System.arraycopy(bytes, 0, value, 2, 4);
             s.log.tell(new Log.InsertEntry(tag, length, value));

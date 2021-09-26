@@ -378,6 +378,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         byte[] cipherText = new byte[keys.length + mac.length];
         System.arraycopy(keys, 0, cipherText, 0, keys.length);
         System.arraycopy(mac, 0, cipherText, keys.length, mac.length);
+        //TODO: check tag length
         GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
         cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmParameterSpec);
         return cipher.doFinal(cipherText);
@@ -418,7 +419,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         ActorRef<Key.Command> keyActor =this.keyIdToActor.get(k.keyId);
         //keyActor to deactivate does not exist
         if(keyActor == null) {
-            byte tag = (byte) 0b00000010;
+            byte tag = (byte) 0b00000011;
             short length = 1;
             byte[] value = new byte[1];
             value[0] = k.keyId;
@@ -458,13 +459,13 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             k.currKey++;
             keyActor = this.keyIdToActor.get(k.currKey);
         }
-        if(keyActor == null){
+        if(keyActor == null || k.currKey > k.lastKey){
             byte tag = (byte) 0b00000111;
             short length = (short) ((k.number * 2) + 2);
             byte[] value = new byte[length];
-            value[0] = (byte) (k.number & 0xff);
-            value[1] = (byte) ((k.number >> 8) &0xff);
-            Iterator it = k.keyIdToState.entrySet().iterator();
+            value[1] = (byte) (k.number & 0xff);
+            value[0] = (byte) ((k.number >> 8) & 0xff);
+            /*Iterator it = k.keyIdToState.entrySet().iterator();
             int i = 2;
             while (it.hasNext()) {
                 Map.Entry<Byte, KeyState> pair = (Map.Entry) it.next();
@@ -472,13 +473,24 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
                 i++;
                 value[i] = pair.getValue().toByte();
                 i++;
+            }*/
+            int i = 2;
+            for(Map.Entry<Byte, KeyState> entry : k.keyIdToState.entrySet()) {
+                value[i] = entry.getKey();
+                i++;
+                value[i] = entry.getValue().toByte();
+                i++;
             }
+            System.out.println("got here!");
             k.log.tell(new Log.InsertEntry(tag, length, value));
             k.pum.tell(new PDUManager.KeyInventoryReply(k.number, k.keyIdToState, k.secMan));
         }
         //found a keyActor to check
         else {
+            System.out.println("found keys to check");
+            System.out.println(k.currKey);
             k.number ++;
+            k.currKey++;
             keyActor.tell(new Key.KeyInventory(k.number, k.firstKey, k.lastKey, k.currKey, k.keyIdToState, k.pum, k.secMan, k.log, getContext().getSelf()));
         }
         return this;
@@ -535,13 +547,22 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             value[0] = k.keyId;
             k.log.tell(new Log.InsertEntry(tag, length, value));
         } else {
-            getContext().stop(keyActor);
             this.keyIdToActor.remove(k.keyId);
+            //getContext().stop(keyActor);
+            //this.keyIdToActor.remove(k.keyId);
             byte tag = (byte) 0b10000110;
             short length = 1;
             byte[] value = new byte[1];
             value[0] = k.keyId;
+            System.out.println("key destruction successful");
             k.log.tell(new Log.InsertEntry(tag, length, value));
+            try {
+                Thread.sleep(3000);
+                getContext().stop(keyActor);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
         }
         return this;
     }
@@ -581,4 +602,5 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         }
         return this;
     }
+
 }

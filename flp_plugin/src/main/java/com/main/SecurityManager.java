@@ -158,6 +158,8 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
         bb.put(p.pdu[1]);
         bb.put(p.pdu[2]);
         short length = bb.getShort(0);
+        System.out.println("received length:");
+        System.out.println(length);
         byte[] value = new byte[length];
         for (int i = 0; i < length; i++) {
             value[i] = p.pdu[i + 3];
@@ -186,6 +188,11 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
             //keyActor inventory
             case (byte) 0b00000111: {
                 this.pduMan.tell(new PDUManager.KeyInventory(value, this.keyMan, getContext().getSelf(), this.log));
+                break;
+            }
+            //key destruction
+            case (byte) 0b00000110: {
+                this.pduMan.tell(new PDUManager.KeyDestruction(value, this.keyMan, this.log));
                 break;
             }
             //start SA
@@ -252,6 +259,7 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
 
             case (byte) 0b01010000: {
                 this.pduMan.tell(new PDUManager.ReadARSNWindow(value, this.saMan, this.log, getContext().getSelf()));
+                break;
             }
 
             default:
@@ -264,8 +272,8 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
     private Behavior<Command> onPDUReply(PDUReply p) {
         final byte[] reply = new byte[p.length + 3];
         reply[0] = p.tag;
-        reply[1] = (byte) (p.length & 0xff);
-        reply[2] = (byte) ((p.length >> 8) & 0xff);
+        reply[2] = (byte) (p.length & 0xff);
+        reply[1] = (byte) ((p.length >> 8) & 0xff);
         System.arraycopy(p.value, 0, reply, 3, p.length);
         this.parent.tell(new Module.PDUOut(reply));
         return this;
