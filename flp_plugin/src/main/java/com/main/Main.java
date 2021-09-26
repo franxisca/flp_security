@@ -48,7 +48,7 @@ public class Main {
         Socket pduOut = null;
 
         try {
-            /*tmIn = new Socket(hostName, portSendUnprotectedTM);
+            tmIn = new Socket(hostName, portSendUnprotectedTM);
             tcIn = new Socket(hostName, portSendProtectedTC);
             pduIn = new Socket(hostName, portSendEPCommand);
             InputStream tmInstream = tmIn.getInputStream();
@@ -60,7 +60,7 @@ public class Main {
             pduOut = new Socket(hostName, portReceiveEPReply);
             OutputStream tmOutStream = tmOut.getOutputStream();
             OutputStream tcOutStream = tcOut.getOutputStream();
-            OutputStream pduOutStream = pduOut.getOutputStream();*/
+            OutputStream pduOutStream = pduOut.getOutputStream();
 
             final ActorSystem<GuardianActor.Command> mainActor = ActorSystem.create(GuardianActor.create(), "guardian-actor");
             int active = 50;
@@ -75,7 +75,7 @@ public class Main {
                 //TODO: maybe find a different solution than timeout until initialization is finished
                 Thread.sleep(5000);
                 //TODO
-                /*Scanner tmScanner = new Scanner(new InputStreamReader(tmInstream));
+                Scanner tmScanner = new Scanner(new InputStreamReader(tmInstream));
                 Scanner tcScanner = new Scanner(new InputStreamReader(tcInstream));
                 Scanner pduScanner = new Scanner(new InputStreamReader(pduInstream));
                 while(tmScanner.hasNextByte()) {
@@ -108,7 +108,7 @@ public class Main {
                     ByteBuffer bb = ByteBuffer.allocate(2);
                     bb.put(lenArray[0]);
                     bb.put(lenArray[1]);
-                    short finLength = bb.getShort(0) + 1;
+                    short finLength = (short) (bb.getShort(0) + 1);
                     byte[] tc = new byte[finLength];
                     System.arraycopy(frameHeader, 0, tc, 0, frameHeader.length);
                     //TODO: assumes TC frame length includes header and trailer
@@ -134,7 +134,7 @@ public class Main {
                         pdu[i] = pduScanner.nextByte();
                     }
                     mainActor.tell(new GuardianActor.PDU(pdu));
-                }*/
+                }
                 //from here: testing of ping
                 /*byte[] pdu = new byte[3];
                 pdu[0] = (byte) 0b00110001;
@@ -198,8 +198,8 @@ public class Main {
                 e.printStackTrace();
             }
         }
-        catch (Exception e){e.printStackTrace();}
-        /*catch (UnknownHostException e) {
+        //catch (Exception e){e.printStackTrace();}
+        catch (UnknownHostException e) {
             System.out.println("Unknown Host...");
             e.printStackTrace();
         }
@@ -262,7 +262,7 @@ public class Main {
                     e.printStackTrace();
                 }
             }
-        }*/
+        }
     }
 
     private static short getShort(byte byte1, byte byte2) {

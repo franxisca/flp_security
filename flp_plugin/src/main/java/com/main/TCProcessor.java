@@ -52,7 +52,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
 
     public static final class TC implements Command {
 
-        final boolean[] vcId;
+        final int vcId;
         final byte[] primHeader;
         final byte[] secHeader;
         final byte[] data;
@@ -66,7 +66,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         final byte[] key;
         final short sPi;
 
-        public TC(boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, byte[] arc, byte[] authMask, ActorRef<Module.Command> parent, byte keyId, byte[] key, short sPi) {
+        public TC(int vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, byte[] arc, byte[] authMask, ActorRef<Module.Command> parent, byte keyId, byte[] key, short sPi) {
             this.vcId = vcId;
             this.primHeader = primHeader;
             this.secHeader = secHeader;
@@ -132,7 +132,10 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         short sPi = bb.getShort(0);
         byte vc = tc.primHeader[2];
         //BitSet bits = BitSet.valueOf(vc);
-        boolean[] vcId = new boolean[8];
+        byte vcOnly = (byte) (vc & 0b11111100);
+        byte vcShift = (byte) (vcOnly >> 2);
+        int vcId = (int) vcShift;
+        /*boolean[] vcId = new boolean[8];
         vcId[0] = false;
         vcId[1] = false;
         for(int i = 2; i < 8; i++){
@@ -143,7 +146,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
             else {
                 vcId[9-i] = false;
             }
-        }
+        }*/
 
 
         tc.parent.tell(new Module.GetTCInfo(sPi, vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, getContext().getSelf(), tc.parent));

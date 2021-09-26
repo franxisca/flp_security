@@ -18,7 +18,7 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
     public static final class GetTCInfo implements Command {
 
         final short sPi;
-        final boolean[] vcId;
+        final int vcId;
         final byte[] primHeader;
         final byte[] secHeader;
         final byte[] data;
@@ -28,7 +28,7 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
         final ActorRef<TCProcessor.Command> tcProc;
         final ActorRef<Module.Command> parent;
 
-        public GetTCInfo(short sPi, boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent) {
+        public GetTCInfo(short sPi, int vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent) {
             this.sPi = sPi;
             this.vcId = vcId;
             this.primHeader = primHeader;

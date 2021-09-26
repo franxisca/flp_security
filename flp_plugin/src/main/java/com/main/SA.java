@@ -125,7 +125,7 @@ public class SA extends AbstractBehavior<SA.Command> {
     public static final class GetTCInfo implements Command {
 
         //final short sPi;
-        final boolean[] vcId;
+        final int vcId;
         final byte[] primHeader;
         final byte[] secHeader;
         final byte[] data;
@@ -136,7 +136,7 @@ public class SA extends AbstractBehavior<SA.Command> {
         final ActorRef<Module.Command> parent;
         final ActorRef<KeyManager.Command> keyMan;
 
-        public GetTCInfo(/*short sPi, */boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent, ActorRef<KeyManager.Command> keyMan) {
+        public GetTCInfo(/*short sPi, */int vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent, ActorRef<KeyManager.Command> keyMan) {
             //this.sPi = sPi;
             this.vcId = vcId;
             this.primHeader = primHeader;
@@ -482,7 +482,7 @@ public class SA extends AbstractBehavior<SA.Command> {
         }
         //SA not applied on channel
         //channel length fixed to 32 bits and stored as integer
-        byte[] chan;
+        /*byte[] chan;
         BitSet bits = new BitSet(tc.vcId.length);
         for(int i = 0; i < tc.vcId.length; i++) {
             if(tc.vcId[i]) {
@@ -496,9 +496,9 @@ public class SA extends AbstractBehavior<SA.Command> {
         channel[1] = 0;
         channel[2] = 0;
         System.arraycopy(chan, 0, channel, 3, 1);
-        int channelInt = ByteBuffer.wrap(channel).getInt();
+        int channelInt = ByteBuffer.wrap(channel).getInt();*/
         //SA not applicable on channel
-        if(!this.channels.contains(channelInt)) {
+        if(!this.channels.contains(tc.vcId)) {
             tc.tcProc.tell(new TCProcessor.BadSA(this.sPi, tc.secHeader, tc.parent));
         }
         else {

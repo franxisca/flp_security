@@ -19,7 +19,7 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
     public static final class GetTCInfo implements Command {
 
         final short sPi;
-        final boolean[] vcId;
+        final int vcId;
         final byte[] primHeader;
         final byte[] secHeader;
         final byte[] data;
@@ -30,7 +30,7 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
         final ActorRef<Module.Command> parent;
         final ActorRef<KeyManager.Command> keyMan;
 
-        public GetTCInfo(short sPi, boolean[] vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent, ActorRef<KeyManager.Command> keyMan) {
+        public GetTCInfo(short sPi, int vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent, ActorRef<KeyManager.Command> keyMan) {
             this.sPi = sPi;
             this.vcId = vcId;
             this.primHeader = primHeader;
