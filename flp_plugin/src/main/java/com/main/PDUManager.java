@@ -36,7 +36,6 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     //SecurityManager needs to pass reference to KeyManager when issuing otar to PDUManager
     //should work
-    //TODO: test
     public static final class Otar implements Command {
         //final byte[] length;
         final byte[] value;
@@ -77,7 +76,6 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     //should work
-    //TODO: test
     public static final class KeyVerification implements Command{
         final byte[] value;
         final ActorRef<KeyManager.Command> replyTo;
@@ -442,7 +440,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         for (int i = 0; i < 12; i++) {
             iv[i] = o.value[i+1];
         }
-        byte[] mac = new byte[16];
+        /*byte[] mac = new byte[16];
         byte[] keys = new byte[o.value.length - (1+12+16)];
         int i = 1;
         for (int j = 15; j >= 0; j--) {
@@ -453,8 +451,10 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         for (int j = 0; j < (o.value.length - 29); j++) {
             keys[j] = o.value[k];
             k++;
-        }
-        o.replyTo.tell(new KeyManager.OTAR(masterKey, iv, mac, keys, o.log));
+        }*/
+        byte[] cipherText = new byte[o.value.length - (iv.length + 1)];
+        System.arraycopy(o.value, 13, cipherText, 0, cipherText.length);
+        o.replyTo.tell(new KeyManager.OTAR(masterKey, iv,cipherText, o.log));
         return this;
     }
 

@@ -28,15 +28,13 @@ public class Key extends AbstractBehavior<Key.Command> {
     }
 
     public static final class GetMaster implements Command {
-        final byte[] keys;
         final byte[] iv;
-        final byte[] mac;
+        final byte[] cipherText;
         final ActorRef<Log.Command> log;
         final ActorRef<KeyManager.Command> keyMan;
 
-        public GetMaster(byte[] keys, byte[] mac, byte[] iv, ActorRef<Log.Command> log, ActorRef<KeyManager.Command> keyMan) {
-            this.keys = keys;
-            this.mac = mac;
+        public GetMaster(byte[] cipherText, byte[] iv, ActorRef<Log.Command> log, ActorRef<KeyManager.Command> keyMan) {
+            this.cipherText = cipherText;
             this.iv = iv;
             this.log = log;
             this.keyMan = keyMan;
@@ -320,13 +318,14 @@ public class Key extends AbstractBehavior<Key.Command> {
     private Behavior<Command> onMaster(GetMaster m) {
         if(!this.master) {
             byte tag = (byte) 0b00100001;
+            //byte tag = -1;
             short length  = 1;
             byte[] value = new byte[1];
             value[0] = this.keyId;
             m.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
-            m.keyMan.tell(new KeyManager.DecOtar(this.keyId, this.key, m.iv, m.mac, m.keys, m.log));
+            m.keyMan.tell(new KeyManager.DecOtar(this.keyId, this.key, m.iv, m.cipherText, m.log));
         }
         return this;
     }

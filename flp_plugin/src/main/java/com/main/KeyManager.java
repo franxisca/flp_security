@@ -9,10 +9,7 @@ import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
@@ -110,17 +107,17 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
 
         final byte masterKey;
         final byte[] iv;
-        final byte[] mac;
-        final byte[] keys;
+        /*final byte[] mac;
+        final byte[] keys;*/
+        final byte[] cipherText;
         final ActorRef<Log.Command> log;
 
-        public OTAR(byte masterKey, byte[] iv, byte[] mac, byte[] keys, ActorRef<Log.Command> log) {
+        public OTAR(byte masterKey, byte[] iv, byte[] cipherText, ActorRef<Log.Command> log) {
 
             this.masterKey = masterKey;
             this.iv = iv;
-            this.mac = mac;
-            this.keys = keys;
             this.log = log;
+            this.cipherText = cipherText;
         }
 
     }
@@ -129,16 +126,14 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         final byte masterId;
         final byte[] masterKey;
         final byte[] iv;
-        final byte[] mac;
-        final byte[] keys;
+        final byte[] cipherText;
         final ActorRef<Log.Command> log;
 
-        public DecOtar(byte masterId, byte[] masterKey, byte[] iv, byte[] mac, byte[] keys, ActorRef<Log.Command> log) {
+        public DecOtar(byte masterId, byte[] masterKey, byte[] iv, byte[] cipherText, ActorRef<Log.Command> log) {
             this.masterId = masterId;
             this.masterKey = masterKey;
             this.iv = iv;
-            this.mac = mac;
-            this.keys = keys;
+            this.cipherText = cipherText;
             this.log = log;
         }
     }
@@ -319,7 +314,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             o.log.tell(new Log.InsertEntry(tag, length, value));
         }
         else {
-            master.tell(new Key.GetMaster(o.keys, o.mac, o.iv, o.log, getContext().getSelf()));
+            master.tell(new Key.GetMaster(o.cipherText, o.iv, o.log, getContext().getSelf()));
         }
         return this;
     }
@@ -329,12 +324,20 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         //decryption worked
         //TODO: assumes decryption returns plain text only
         try {
-            byte[] plain = decrypt(d.keys, d.masterKey, d.iv, d.mac);
+            System.out.println("got master key");
+            System.out.println(Arrays.toString(d.masterKey));
+            System.out.println("got iv");
+            System.out.println(Arrays.toString(d.iv));
+            System.out.println("got ciphertext");
+            System.out.println(Arrays.toString(d.cipherText));
+            byte[] plain = decrypt(d.cipherText, d.masterKey, d.iv);
+            System.out.println("try to decrypt");
+            System.out.println(Arrays.toString(plain));
             for(int i = 0; i < plain.length; i++) {
                 byte keyId = plain[i];
                 i++;
-                byte[] key = new byte[256];
-                for(int j = 0; j < 256; j++) {
+                byte[] key = new byte[32];
+                for(int j = 0; j < 32; j++) {
                     key[j] = plain[i];
                     i++;
                 }
@@ -362,6 +365,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         //error in key decryption
         catch (Exception e) {
             byte tag = (byte) 0b00010001;
+            //byte tag = -1;
             short length  = 1;
             byte[] value  = new byte[1];
             value[0] = d.masterId;
@@ -372,12 +376,12 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
     }
 
     //TODO: check if that works, does tag need to be appended to ciphertext?
-    public static byte[] decrypt(byte[] keys, byte[] masterKey, byte[] iv, byte[] mac) throws Exception {
+    private static byte[] decrypt(byte[] cipherText, byte[] masterKey, byte[] iv) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         SecretKey secretKey = new SecretKeySpec(masterKey, "AES");
-        byte[] cipherText = new byte[keys.length + mac.length];
+        /*byte[] cipherText = new byte[keys.length + mac.length];
         System.arraycopy(keys, 0, cipherText, 0, keys.length);
-        System.arraycopy(mac, 0, cipherText, keys.length, mac.length);
+        System.arraycopy(mac, 0, cipherText, keys.length, mac.length);*/
         //TODO: check tag length
         GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
         cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmParameterSpec);

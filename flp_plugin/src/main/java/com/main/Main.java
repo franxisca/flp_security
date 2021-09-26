@@ -6,6 +6,10 @@ import akka.actor.ActorContext;
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.ActorSystem;
 
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
@@ -13,6 +17,8 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 public class Main {
+
+    private static final int OTAR_IV_LENGTH = 12;
 
     public static final int portReceiveProcetedTM = 8080;
     public static final int portReceiveUnprotectedTC = 8081;
@@ -166,13 +172,19 @@ public class Main {
                 testExpire(mainActor);
                 Thread.sleep(3000);
                 testStatusRequest(mainActor);*/
-                testSetARSNWindow(mainActor);
+                /*testSetARSNWindow(mainActor);
                 Thread.sleep(3000);
                 testReadARSNWindow(mainActor);
                 Thread.sleep(3000);
                 testDumpLog(mainActor);
                 Thread.sleep(3000);
-                testEraseLog(mainActor);
+                testEraseLog(mainActor);*/
+                //testVerification(mainActor);
+                testOtar(mainActor);
+                Thread.sleep(3000);
+                testInventory(mainActor);
+                Thread.sleep(3000);
+                testDumpLog(mainActor);
                 try {
                     System.out.println(">>> Press ENTER to exit <<<");
                     System.in.read();
@@ -342,9 +354,86 @@ public class Main {
         mainActor.tell(new GuardianActor.PDU(pdu));
     }
 
-   //TODO
-    private void testOtar(ActorSystem<GuardianActor.Command> mainActor) {
-        //byte[] pdu = new byte[3 + ]
+   //TODO: assumes iv length x (see constant), tag length 128
+    private static void testOtar(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[4 + OTAR_IV_LENGTH + 1 + 32 + 16];
+        pdu[0] = (byte) 0b00000001;
+        short length = (short) (pdu.length - 3);
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        byte keyID = 40;
+        byte[] key = new byte[32];
+        for(int i = 0; i < key.length; i++) {
+            key[i] = 0;
+        }
+        byte[] plaintext = new byte[33];
+        plaintext[0] = keyID;
+        System.arraycopy(key, 0, plaintext, 1, key.length);
+        byte[] iv = new byte[OTAR_IV_LENGTH];
+        int j = 4;
+        for(int i = 0; i < iv.length; i++) {
+            iv[i] = 0;
+            pdu[j] = 0;
+            j++;
+        }
+        byte master = 0;
+        pdu[3] = master;
+        byte[] masterKey = new byte[32];
+        try {
+            Scanner scanner = new Scanner(new File("keys"));
+            int i = 0;
+            while(scanner.hasNextByte() && i < 32) {
+                masterKey[i] = scanner.nextByte();
+                i++;
+            }
+            System.out.println("check master key");
+            System.out.println(Arrays.toString(masterKey));
+            try {
+                byte[] enc = encrypt(plaintext, masterKey, iv);
+                System.arraycopy(enc, 0, pdu, j, enc.length);
+                System.out.println("check pdu");
+                System.out.println(Arrays.toString(pdu));
+                mainActor.tell(new GuardianActor.PDU(pdu));
+
+                try {
+                    System.out.println("ciphertex:");
+                    System.out.println(Arrays.toString(enc));
+                    byte[] dec = decrypt(enc, masterKey, iv);
+                    System.out.println(Arrays.toString(dec));
+                }
+                catch (Exception e) {
+                    System.out.println("error in decryption");
+                }
+
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    private static byte[] decrypt(byte[] cipherText, byte[] masterKey, byte[] iv) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        SecretKey secretKey = new SecretKeySpec(masterKey, "AES");
+        /*byte[] cipherText = new byte[keys.length + mac.length];
+        System.arraycopy(keys, 0, cipherText, 0, keys.length);
+        System.arraycopy(mac, 0, cipherText, keys.length, mac.length);*/
+        //TODO: check tag length
+        GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmParameterSpec);
+        return cipher.doFinal(cipherText);
+    }
+
+    private static byte[] encrypt(byte[] plain, byte[] key, byte[] iv) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        SecretKey secretKey = new SecretKeySpec(key, "AES");
+        GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmParameterSpec);
+        return cipher.doFinal(plain);
     }
 
     //TODO: correct all my bitshifts (the least significant byte of short is retrieved first not the other way around)
@@ -408,8 +497,8 @@ public class Main {
         short length = 2;
         pdu[2] = (byte) (length & 0xff);
         pdu[1] = (byte) ((length >> 8) & 0xff);
-        pdu[3] = 0;
-        pdu[4] = 39;
+        pdu[3] = 40;
+        pdu[4] = 40;
         mainActor.tell(new GuardianActor.PDU(pdu));
     }
 
@@ -518,6 +607,18 @@ public class Main {
         pdu[1] = (byte) ((length >> 8) & 0xff);
         pdu[3] = 0;
         pdu[4] = 0;
+        mainActor.tell(new GuardianActor.PDU(pdu));
+    }
+
+    private static void testVerification(ActorSystem<GuardianActor.Command> mainActor) {
+        byte[] pdu = new byte[6];
+        pdu[0] = (byte) 0b00000100;
+        short length = 3;
+        pdu[2] = (byte) (length & 0xff);
+        pdu[1] = (byte) ((length >> 8) & 0xff);
+        pdu[3] = 20;
+        pdu[4] = 0;
+        pdu[5] = 0;
         mainActor.tell(new GuardianActor.PDU(pdu));
     }
 }
