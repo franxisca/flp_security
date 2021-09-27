@@ -69,72 +69,93 @@ public class Main {
             Map<Integer, Short> vcToSA = getVC();
             Map<Short, Byte> criticalSA = criticalSAs();
             List<Short> standardSA = standardSAs();
-            //TODO
-            mainActor.tell(new GuardianActor.Start(active, masterKeys, sessionKeys, vcToSA, criticalSA, standardSA, null, null, null));
+            mainActor.tell(new GuardianActor.Start(active, masterKeys, sessionKeys, vcToSA, criticalSA, standardSA, tmOutStream, tcOutStream, pduOutStream));
             try {
-                //TODO: maybe find a different solution than timeout until initialization is finished
+                //maybe find a different solution than timeout until initialization is finished
                 Thread.sleep(5000);
-                //TODO
                 Scanner tmScanner = new Scanner(new InputStreamReader(tmInstream));
                 Scanner tcScanner = new Scanner(new InputStreamReader(tcInstream));
                 Scanner pduScanner = new Scanner(new InputStreamReader(pduInstream));
-                while(tmScanner.hasNextByte()) {
-                    byte[] tm = new byte[1115];
-                    for(int i = 0; i < 1115; i++) {
-                        tm[i] = tmScanner.nextByte();
-                    }
-                    mainActor.tell(new GuardianActor.TM(tm));
-                }
-                while(tcScanner.hasNextByte()) {
-                    //TODO: scan tc according to length
-                    byte[] frameHeader= new byte[5];
-                    for(int i = 0; i < 5; i++) {
-                        frameHeader[i] = tcScanner.nextByte();
-                    }
-                    BitSet header = BitSet.valueOf(frameHeader);
-                    BitSet length = header.get(22, 32);
-                    BitSet augLength = new BitSet(16);
-                    for(int i = 0; i < 6; i++) {
-                        augLength.clear(i);
-                    }
-                    int j = 0;
-                    for(int i = 6; i < 16; i++){
-                        if(length.get(j)) {
-                            augLength.set(i);
+                Thread tmThread = new Thread() {
+                    public void run () {
+                        while (true) {
+                            while (tmScanner.hasNextByte()) {
+                                byte[] tm = new byte[1115];
+                                for (int i = 0; i < 1115; i++) {
+                                    tm[i] = tmScanner.nextByte();
+                                }
+                                mainActor.tell(new GuardianActor.TM(tm));
+                            }
                         }
-                        j++;
                     }
-                    byte[] lenArray = augLength.toByteArray();
-                    ByteBuffer bb = ByteBuffer.allocate(2);
-                    bb.put(lenArray[0]);
-                    bb.put(lenArray[1]);
-                    short finLength = (short) (bb.getShort(0) + 1);
-                    byte[] tc = new byte[finLength];
-                    System.arraycopy(frameHeader, 0, tc, 0, frameHeader.length);
-                    //TODO: assumes TC frame length includes header and trailer
-                    for(int i = 5; i < finLength; i++) {
-                        tc[i] = tcScanner.nextByte();
+                };
+
+                Thread tcThread = new Thread() {
+                    public void run() {
+                        while (true) {
+                            while (tcScanner.hasNextByte()) {
+                                //TODO: scan tc according to length
+                                byte[] frameHeader = new byte[5];
+                                for (int i = 0; i < 5; i++) {
+                                    frameHeader[i] = tcScanner.nextByte();
+                                }
+                                BitSet header = BitSet.valueOf(frameHeader);
+                                BitSet length = header.get(22, 32);
+                                BitSet augLength = new BitSet(16);
+                                for (int i = 0; i < 6; i++) {
+                                    augLength.clear(i);
+                                }
+                                int j = 0;
+                                for (int i = 6; i < 16; i++) {
+                                    if (length.get(j)) {
+                                        augLength.set(i);
+                                    }
+                                    j++;
+                                }
+                                byte[] lenArray = augLength.toByteArray();
+                                ByteBuffer bb = ByteBuffer.allocate(2);
+                                bb.put(lenArray[0]);
+                                bb.put(lenArray[1]);
+                                short finLength = (short) (bb.getShort(0) + 1);
+                                byte[] tc = new byte[finLength];
+                                System.arraycopy(frameHeader, 0, tc, 0, frameHeader.length);
+                                //TODO: assumes TC frame length includes header and trailer
+                                for (int i = 5; i < finLength; i++) {
+                                    tc[i] = tcScanner.nextByte();
+                                }
+                                mainActor.tell(new GuardianActor.TC(tc));
+                            }
+                        }
                     }
-                    mainActor.tell(new GuardianActor.TC(tc));
-                }
-                //TODO: needs to run simultaneously to tm and tc?
-                while(pduScanner.hasNextByte()) {
-                    byte tag = pduScanner.nextByte();
-                    ByteBuffer bb = ByteBuffer.allocate(2);
-                    byte length1 = pduScanner.nextByte();
-                    byte length2 = pduScanner.nextByte();
-                    bb.put(length1);
-                    bb.put(length2);
-                    short length = bb.getShort(0);
-                    byte[] pdu = new byte[length+3];
-                    pdu[0] = tag;
-                    pdu[1] = length1;
-                    pdu[2] = length2;
-                    for (int i = 3; i < length + 3; i++) {
-                        pdu[i] = pduScanner.nextByte();
+                };
+
+                Thread pduThread = new Thread() {
+                    public void run () {
+                        while (true) {
+                            while (pduScanner.hasNextByte()) {
+                                byte tag = pduScanner.nextByte();
+                                ByteBuffer bb = ByteBuffer.allocate(2);
+                                byte length1 = pduScanner.nextByte();
+                                byte length2 = pduScanner.nextByte();
+                                bb.put(length1);
+                                bb.put(length2);
+                                short length = bb.getShort(0);
+                                byte[] pdu = new byte[length + 3];
+                                pdu[0] = tag;
+                                pdu[1] = length1;
+                                pdu[2] = length2;
+                                for (int i = 3; i < length + 3; i++) {
+                                    pdu[i] = pduScanner.nextByte();
+                                }
+                                mainActor.tell(new GuardianActor.PDU(pdu));
+                            }
+                        }
                     }
-                    mainActor.tell(new GuardianActor.PDU(pdu));
-                }
+                };
+                tmThread.start();
+                tcThread.start();
+                pduThread.start();
+
                 //from here: testing of ping
                 /*byte[] pdu = new byte[3];
                 pdu[0] = (byte) 0b00110001;
@@ -186,7 +207,7 @@ public class Main {
                 testInventory(mainActor);
                 Thread.sleep(3000);
                 testDumpLog(mainActor);*/
-                testTM(mainActor);
+                //testTM(mainActor);
                 try {
                     System.out.println(">>> Press ENTER to exit <<<");
                     System.in.read();

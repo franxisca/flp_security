@@ -98,10 +98,10 @@ public class GuardianActor extends AbstractBehavior<GuardianActor.Command> {
 
     private Behavior<Command> onStart(Start s) {
         //TODO: enable IO
-        /*ActorRef<PDUOutstream.Command> pduOut = getContext().spawn(PDUOutstream.create(s.pduStream), "pdu-output-stream");
+        ActorRef<PDUOutstream.Command> pduOut = getContext().spawn(PDUOutstream.create(s.pduStream), "pdu-output-stream");
         ActorRef<TMOutStream.Command> tmOut = getContext().spawn(TMOutStream.create(s.tmStream), "tm-output-stream");
-        ActorRef<TCOutstream.Command> tcOut = getContext().spawn(TCOutstream.create(s.tcStream), "tc-output-stream");*/
-        ActorRef<Module.Command> module1 = getContext().spawn(Module.create(null, s.active1, null, null, getContext().getSelf()), "module-1");
+        ActorRef<TCOutstream.Command> tcOut = getContext().spawn(TCOutstream.create(s.tcStream), "tc-output-stream");
+        ActorRef<Module.Command> module1 = getContext().spawn(Module.create(pduOut, s.active1, tmOut, tcOut, getContext().getSelf()), "module-1");
         this.module = module1;
         module1.tell(new Module.InitSA(s.criticalSA1, s.standardSA1));
         module1.tell(new Module.DefaultSA(s.vcToDefaultSA1));
