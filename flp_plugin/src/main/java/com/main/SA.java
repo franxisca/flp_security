@@ -221,8 +221,8 @@ public class SA extends AbstractBehavior<SA.Command> {
 
     private SA(ActorContext<Command> context, short sPi, int authMaskLength, byte[] authBitMask, boolean critical, byte keyId) {
         super(context);
-        System.out.println("discoverd spi:");
-        System.out.println(sPi);
+        /*System.out.println("discoverd spi:");
+        System.out.println(sPi);*/
         this.sPi = sPi;
         this.authBitMask = authBitMask;
         this.authMaskLength = authMaskLength;

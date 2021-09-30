@@ -37,6 +37,8 @@ com/main/Key.java
  com.main.Key$Verify
 com/main/Main.java
  com.main.Main
+ com.main.Main$1
+ com.main.Main$2
 com/main/SA.java
  com.main.SA
  com.main.SA$ArcIncrement

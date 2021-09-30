@@ -16,18 +16,24 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+//TODO: iv length 16
+//TODO: increment not on least 4 significant bytes
+//TODO: key verification 12 byte 0
+//TODO: TC output
+//TODO: TM input
+
 
 public class Main {
 
     private static final int OTAR_IV_LENGTH = 12;
 
     public static final int portReceiveProcetedTM = 8080;
-    public static final int portReceiveUnprotectedTC = 8081;
+    //public static final int portReceiveUnprotectedTC = 8081;
     public static final int portReceiveUserCommand = 8082;
     public static final int portReceiveEPReply = 8083;
 
     public static final int portSendProtectedTC = 8084;
-    public static final int portSendUnprotectedTM = 8085;
+    //public static final int portSendUnprotectedTM = 8085;
     public static final int portSendEPCommand = 8086;
     public static final int portSendEPReply = 8087;
     public static final int portSendError = 8088;
@@ -37,7 +43,7 @@ public class Main {
     public static final int chunckLengthInByte = 10;
     public static final int stringLengtthEncodingInByte = 2;
 
-    public static void main(String[] args){
+    public static void main(String[] args) {
 
         Socket tmIn = null;
         Socket tcIn = null;
@@ -46,117 +52,123 @@ public class Main {
         Socket tmOut = null;
         Socket tcOut = null;
         Socket pduOut = null;
+        //tmIn = new Socket(hostName, portSendUnprotectedTM);
+        int retry = 0;
+        int threshold = 100;
+        final ActorSystem<GuardianActor.Command> mainActor = ActorSystem.create(GuardianActor.create(), "guardian-actor");
 
-        try {
-            tmIn = new Socket(hostName, portSendUnprotectedTM);
-            tcIn = new Socket(hostName, portSendProtectedTC);
-            pduIn = new Socket(hostName, portSendEPCommand);
-            InputStream tmInstream = tmIn.getInputStream();
-            InputStream tcInstream = tcIn.getInputStream();
-            InputStream pduInstream = pduIn.getInputStream();
 
-            tmOut = new Socket(hostName, portReceiveProcetedTM);
-            tcOut = new Socket(hostName, portReceiveUnprotectedTC);
-            pduOut = new Socket(hostName, portReceiveEPReply);
-            OutputStream tmOutStream = tmOut.getOutputStream();
-            OutputStream tcOutStream = tcOut.getOutputStream();
-            OutputStream pduOutStream = pduOut.getOutputStream();
-
-            final ActorSystem<GuardianActor.Command> mainActor = ActorSystem.create(GuardianActor.create(), "guardian-actor");
-            int active = 50;
-            Map<Byte, byte[]> masterKeys = masterKeys();
-            Map<Byte, byte[]> sessionKeys = sessionKeys();
-            Map<Integer, Short> vcToSA = getVC();
-            Map<Short, Byte> criticalSA = criticalSAs();
-            List<Short> standardSA = standardSAs();
-            mainActor.tell(new GuardianActor.Start(active, masterKeys, sessionKeys, vcToSA, criticalSA, standardSA, tmOutStream, tcOutStream, pduOutStream));
+        while (true) {
             try {
-                //maybe find a different solution than timeout until initialization is finished
-                Thread.sleep(5000);
-                Scanner tmScanner = new Scanner(new InputStreamReader(tmInstream));
-                Scanner tcScanner = new Scanner(new InputStreamReader(tcInstream));
-                Scanner pduScanner = new Scanner(new InputStreamReader(pduInstream));
-                Thread tmThread = new Thread() {
-                    public void run () {
-                        while (true) {
-                            while (tmScanner.hasNextByte()) {
-                                byte[] tm = new byte[1115];
-                                for (int i = 0; i < 1115; i++) {
-                                    tm[i] = tmScanner.nextByte();
-                                }
-                                mainActor.tell(new GuardianActor.TM(tm));
-                            }
-                        }
-                    }
-                };
+                //tmIn = new Socket(hostName, portSendUnprotectedTM);
+                tcIn = new Socket(hostName, portSendProtectedTC);
+                pduIn = new Socket(hostName, portSendEPCommand);
+                //InputStream tmInstream = tmIn.getInputStream();
+                InputStream tcInstream = tcIn.getInputStream();
+                InputStream pduInstream = pduIn.getInputStream();
 
-                Thread tcThread = new Thread() {
-                    public void run() {
-                        while (true) {
-                            while (tcScanner.hasNextByte()) {
-                                //TODO: scan tc according to length
-                                byte[] frameHeader = new byte[5];
-                                for (int i = 0; i < 5; i++) {
-                                    frameHeader[i] = tcScanner.nextByte();
-                                }
-                                BitSet header = BitSet.valueOf(frameHeader);
-                                BitSet length = header.get(22, 32);
-                                BitSet augLength = new BitSet(16);
-                                for (int i = 0; i < 6; i++) {
-                                    augLength.clear(i);
-                                }
-                                int j = 0;
-                                for (int i = 6; i < 16; i++) {
-                                    if (length.get(j)) {
-                                        augLength.set(i);
+                tmOut = new Socket(hostName, portReceiveProcetedTM);
+                //tcOut = new Socket(hostName, portReceiveUnprotectedTC);
+                pduOut = new Socket(hostName, portReceiveEPReply);
+                OutputStream tmOutStream = tmOut.getOutputStream();
+                //OutputStream tcOutStream = tcOut.getOutputStream();
+                OutputStream pduOutStream = pduOut.getOutputStream();
+
+                //final ActorSystem<GuardianActor.Command> mainActor = ActorSystem.create(GuardianActor.create(), "guardian-actor");
+                int active = 50;
+                Map<Byte, byte[]> masterKeys = masterKeys();
+                Map<Byte, byte[]> sessionKeys = sessionKeys();
+                Map<Integer, Short> vcToSA = getVC();
+                Map<Short, Byte> criticalSA = criticalSAs();
+                List<Short> standardSA = standardSAs();
+                mainActor.tell(new GuardianActor.Start(active, masterKeys, sessionKeys, vcToSA, criticalSA, standardSA, tmOutStream, null, pduOutStream));
+                try {
+                    //maybe find a different solution than timeout until initialization is finished
+                    Thread.sleep(5000);
+                    //Scanner tmScanner = new Scanner(new InputStreamReader(tmInstream));
+                    Scanner tcScanner = new Scanner(new InputStreamReader(tcInstream));
+                    Scanner pduScanner = new Scanner(new InputStreamReader(pduInstream));
+                    /*Thread tmThread = new Thread() {
+                        public void run() {
+                            while (true) {
+                                while (tmScanner.hasNextByte()) {
+                                    byte[] tm = new byte[1115];
+                                    for (int i = 0; i < 1115; i++) {
+                                        tm[i] = tmScanner.nextByte();
                                     }
-                                    j++;
+                                    mainActor.tell(new GuardianActor.TM(tm));
                                 }
-                                byte[] lenArray = augLength.toByteArray();
-                                ByteBuffer bb = ByteBuffer.allocate(2);
-                                bb.put(lenArray[0]);
-                                bb.put(lenArray[1]);
-                                short finLength = (short) (bb.getShort(0) + 1);
-                                byte[] tc = new byte[finLength];
-                                System.arraycopy(frameHeader, 0, tc, 0, frameHeader.length);
-                                //TODO: assumes TC frame length includes header and trailer
-                                for (int i = 5; i < finLength; i++) {
-                                    tc[i] = tcScanner.nextByte();
-                                }
-                                mainActor.tell(new GuardianActor.TC(tc));
                             }
                         }
-                    }
-                };
+                    };*/
 
-                Thread pduThread = new Thread() {
-                    public void run () {
-                        while (true) {
-                            while (pduScanner.hasNextByte()) {
-                                byte tag = pduScanner.nextByte();
-                                ByteBuffer bb = ByteBuffer.allocate(2);
-                                byte length1 = pduScanner.nextByte();
-                                byte length2 = pduScanner.nextByte();
-                                bb.put(length1);
-                                bb.put(length2);
-                                short length = bb.getShort(0);
-                                byte[] pdu = new byte[length + 3];
-                                pdu[0] = tag;
-                                pdu[1] = length1;
-                                pdu[2] = length2;
-                                for (int i = 3; i < length + 3; i++) {
-                                    pdu[i] = pduScanner.nextByte();
+                    Thread tcThread = new Thread() {
+                        public void run() {
+                            while (true) {
+                                while (tcScanner.hasNextByte()) {
+                                    //TODO: scan tc according to length
+                                    byte[] frameHeader = new byte[5];
+                                    for (int i = 0; i < 5; i++) {
+                                        frameHeader[i] = tcScanner.nextByte();
+                                    }
+                                    BitSet header = BitSet.valueOf(frameHeader);
+                                    BitSet length = header.get(22, 32);
+                                    BitSet augLength = new BitSet(16);
+                                    for (int i = 0; i < 6; i++) {
+                                        augLength.clear(i);
+                                    }
+                                    int j = 0;
+                                    for (int i = 6; i < 16; i++) {
+                                        if (length.get(j)) {
+                                            augLength.set(i);
+                                        }
+                                        j++;
+                                    }
+                                    byte[] lenArray = augLength.toByteArray();
+                                    ByteBuffer bb = ByteBuffer.allocate(2);
+                                    bb.put(lenArray[0]);
+                                    bb.put(lenArray[1]);
+                                    short finLength = (short) (bb.getShort(0) + 1);
+                                    byte[] tc = new byte[finLength];
+                                    System.arraycopy(frameHeader, 0, tc, 0, frameHeader.length);
+                                    //TODO: assumes TC frame length includes header and trailer
+                                    for (int i = 5; i < finLength; i++) {
+                                        tc[i] = tcScanner.nextByte();
+                                    }
+                                    mainActor.tell(new GuardianActor.TC(tc));
                                 }
-                                mainActor.tell(new GuardianActor.PDU(pdu));
                             }
                         }
-                    }
-                };
-                tmThread.start();
-                tcThread.start();
-                pduThread.start();
+                    };
 
-                //from here: testing of ping
+                    Thread pduThread = new Thread() {
+                        public void run() {
+                            while (true) {
+                                while (pduScanner.hasNextByte()) {
+                                    byte tag = pduScanner.nextByte();
+                                    ByteBuffer bb = ByteBuffer.allocate(2);
+                                    byte length1 = pduScanner.nextByte();
+                                    byte length2 = pduScanner.nextByte();
+                                    bb.put(length1);
+                                    bb.put(length2);
+                                    short length = bb.getShort(0);
+                                    byte[] pdu = new byte[length + 3];
+                                    pdu[0] = tag;
+                                    pdu[1] = length1;
+                                    pdu[2] = length2;
+                                    for (int i = 3; i < length + 3; i++) {
+                                        pdu[i] = pduScanner.nextByte();
+                                    }
+                                    mainActor.tell(new GuardianActor.PDU(pdu));
+                                }
+                            }
+                        }
+                    };
+                    //tmThread.start();
+                    tcThread.start();
+                    pduThread.start();
+
+                    //from here: testing of ping
                 /*byte[] pdu = new byte[3];
                 pdu[0] = (byte) 0b00110001;
                 short length = 0;
@@ -201,86 +213,86 @@ public class Main {
                 testDumpLog(mainActor);
                 Thread.sleep(3000);
                 testEraseLog(mainActor);*/
-                //testVerification(mainActor);
+                    //testVerification(mainActor);
                 /*testOtar(mainActor);
                 Thread.sleep(3000);
                 testInventory(mainActor);
                 Thread.sleep(3000);
                 testDumpLog(mainActor);*/
-                //testTM(mainActor);
-                try {
-                    System.out.println(">>> Press ENTER to exit <<<");
-                    System.in.read();
-                } catch (IOException ignored) {
-                } finally {
-                    mainActor.terminate();
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-        //catch (Exception e){e.printStackTrace();}
-        catch (UnknownHostException e) {
-            System.out.println("Unknown Host...");
-            e.printStackTrace();
-        }
-        catch (IOException e) {
-            System.out.println("IOProblem...");
-            e.printStackTrace();
-        }
-        finally {
-            if(tmIn != null) {
-                try {
-                    tmIn.close();
-                }
-                catch (IOException e) {
-                    System.out.println("Can't close socket for TM input");
+                    //testTM(mainActor);
+                    try {
+                        System.out.println(">>> Press ENTER to exit <<<");
+                        System.in.read();
+                    } catch (IOException ignored) {
+                    } finally {
+                        mainActor.terminate();
+                    }
+                } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
-            if(tcIn != null) {
+            //catch (Exception e){e.printStackTrace();}
+            catch (UnknownHostException e) {
+                System.out.println("Unknown Host...");
+                //e.printStackTrace();
+            } catch (IOException e) {
+                System.out.println("Waiting for connection...");
+                System.out.println("Trying again in 10 seconds...");
                 try {
-                    tcIn.close();
+                    Thread.sleep(10000);
                 }
-                catch (IOException e) {
-                    System.out.println("Can't close socket for TC input");
-                    e.printStackTrace();
+                catch (Exception i) {
+                    i.printStackTrace();
                 }
-            }
-            if(pduIn != null) {
-                try {
-                    pduIn.close();
+                //e.printStackTrace();
+            } finally {
+                if (tmIn != null) {
+                    try {
+                        tmIn.close();
+                    } catch (IOException e) {
+                        System.out.println("Can't close socket for TM input");
+                        e.printStackTrace();
+                    }
                 }
-                catch (IOException e) {
-                    System.out.println("Can't close socket for PDU input");
-                    e.printStackTrace();
+                if (tcIn != null) {
+                    try {
+                        tcIn.close();
+                    } catch (IOException e) {
+                        System.out.println("Can't close socket for TC input");
+                        e.printStackTrace();
+                    }
                 }
-            }
-            if(tmOut != null) {
-                try {
-                    tmOut.close();
+                if (pduIn != null) {
+                    try {
+                        pduIn.close();
+                    } catch (IOException e) {
+                        System.out.println("Can't close socket for PDU input");
+                        e.printStackTrace();
+                    }
                 }
-                catch (IOException e) {
-                    System.out.println("Can't close socket for TM output");
-                    e.printStackTrace();
+                if (tmOut != null) {
+                    try {
+                        tmOut.close();
+                    } catch (IOException e) {
+                        System.out.println("Can't close socket for TM output");
+                        e.printStackTrace();
+                    }
                 }
-            }
-            if(tcOut != null) {
-                try {
-                    tcOut.close();
+                if (tcOut != null) {
+                    try {
+                        tcOut.close();
+                    } catch (IOException e) {
+                        System.out.println("Can't close socket for TC output");
+                        e.printStackTrace();
+                    }
                 }
-                catch (IOException e) {
-                    System.out.println("Can't close socket for TC output");
-                    e.printStackTrace();
-                }
-            }
-            if(pduOut != null) {
-                try {
-                    pduOut.close();
-                }
-                catch (IOException e) {
-                    System.out.println("Can't close socket for PDU output");
-                    e.printStackTrace();
+                if (pduOut != null) {
+                    try {
+                        pduOut.close();
+                    } catch (IOException e) {
+                        System.out.println("Can't close socket for PDU output");
+                        e.printStackTrace();
+                    }
                 }
             }
         }

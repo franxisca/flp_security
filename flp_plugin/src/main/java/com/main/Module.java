@@ -321,10 +321,10 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onTCOut(TCOut tc) {
         //TODO
-        /*System.out.println(tc.verificationStatus);
+        System.out.println(tc.verificationStatus);
         System.out.println(tc.verStatCode);
-        System.out.println(tc.secReturn);*/
-        this.tcOut.tell(new TCOutstream.TC(tc.secReturn));
+        System.out.println(Arrays.toString(tc.secReturn));
+        //this.tcOut.tell(new TCOutstream.TC(tc.secReturn));
         return this;
     }
 
