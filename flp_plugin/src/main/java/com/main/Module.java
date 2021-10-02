@@ -256,6 +256,7 @@ public class Module extends AbstractBehavior<Module.Command> {
                 .onMessage(IVOverflow.class, this::onIVOverflow)
                 .onMessage(ARCIncrement.class, this::onArcIncrement)
                 .onMessage(IVIncrement.class, this::onIVIncrement)
+                .onMessage(FSR.class, this::onFSR)
                 .build();
     }
 
@@ -305,6 +306,7 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onTCIn(TCIn tc) {
         byte[] frameHeader = new byte[5];
+        //TODO: security header length
         byte[] secHeader = new byte[18];
         byte[] secTrailer = new byte[16];
         byte[] crc = new byte[2];
@@ -321,10 +323,10 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onTCOut(TCOut tc) {
         //TODO
-        System.out.println(tc.verificationStatus);
+        /*System.out.println(tc.verificationStatus);
         System.out.println(tc.verStatCode);
-        System.out.println(Arrays.toString(tc.secReturn));
-        //this.tcOut.tell(new TCOutstream.TC(tc.secReturn));
+        System.out.println(Arrays.toString(tc.secReturn));*/
+        this.tcOut.tell(new TCOutstream.TC(tc.verificationStatus, tc.verStatCode, tc.secReturn));
         return this;
     }
 
@@ -335,8 +337,8 @@ public class Module extends AbstractBehavior<Module.Command> {
         System.arraycopy(tm.tm, 0, frameHeader, 0, 6);
         System.arraycopy(tm.tm, 6, data, 0, 1105);
         System.arraycopy(tm.tm, 1111, trailer, 0, 4);
-        System.out.println("tm frame header test");
-        System.out.println(Arrays.toString(frameHeader));
+        /*System.out.println("tm frame header test");
+        System.out.println(Arrays.toString(frameHeader));*/
         this.tmProc.tell(new TMProcessor.RawTM(frameHeader, data, trailer));
         return this;
     }
@@ -420,6 +422,11 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onIVIncrement(IVIncrement iv) {
         this.secMan.tell(new SecurityManager.IvIncrement(iv.sPi));
+        return this;
+    }
+
+    private Behavior<Command> onFSR(FSR fsr) {
+        //TODO
         return this;
     }
 }

@@ -43,16 +43,35 @@ public class Main {
     public static final int chunckLengthInByte = 10;
     public static final int stringLengtthEncodingInByte = 2;
 
+    //TODO
+    public static final int TC_IV_LENGTH = 16;
+    public static final int SPI_LENGTH = 2;
+    public static final int ARC_LENGTH = 4;
+    public static final int MAC_LENGTH = 16;
+
     public static void main(String[] args) {
 
-        Socket tmIn = null;
+        //Socket tmIn = null;
         Socket tcIn = null;
         Socket pduIn = null;
 
         Socket tmOut = null;
-        Socket tcOut = null;
+        //Socket tcOut = null;
         Socket pduOut = null;
         //tmIn = new Socket(hostName, portSendUnprotectedTM);
+        /*try {
+            File tcOut = new File("tc-output");
+        }
+        catch (IOException e) {
+
+        }*/
+        File tcOut = new File("tc-output");
+        /*try {
+            FileWriter tcWriter = new FileWriter(tcOut);
+        }
+        catch (IOException e) {
+            System.out.println("Could not create filewriter for tc output..");
+        }*/
         int retry = 0;
         int threshold = 100;
         final ActorSystem<GuardianActor.Command> mainActor = ActorSystem.create(GuardianActor.create(), "guardian-actor");
@@ -81,7 +100,7 @@ public class Main {
                 Map<Integer, Short> vcToSA = getVC();
                 Map<Short, Byte> criticalSA = criticalSAs();
                 List<Short> standardSA = standardSAs();
-                mainActor.tell(new GuardianActor.Start(active, masterKeys, sessionKeys, vcToSA, criticalSA, standardSA, tmOutStream, null, pduOutStream));
+                mainActor.tell(new GuardianActor.Start(active, masterKeys, sessionKeys, vcToSA, criticalSA, standardSA, tmOutStream, tcOut, pduOutStream));
                 try {
                     //maybe find a different solution than timeout until initialization is finished
                     Thread.sleep(5000);
@@ -111,7 +130,10 @@ public class Main {
                                     for (int i = 0; i < 5; i++) {
                                         frameHeader[i] = tcScanner.nextByte();
                                     }
-                                    BitSet header = BitSet.valueOf(frameHeader);
+                                    byte firstLen = (byte) (frameHeader[2] & (byte) 0b00000011);
+                                    int first = firstLen << 8;
+                                    int length = first + frameHeader[3] + 1;
+                                    /*BitSet header = BitSet.valueOf(frameHeader);
                                     BitSet length = header.get(22, 32);
                                     BitSet augLength = new BitSet(16);
                                     for (int i = 0; i < 6; i++) {
@@ -128,11 +150,12 @@ public class Main {
                                     ByteBuffer bb = ByteBuffer.allocate(2);
                                     bb.put(lenArray[0]);
                                     bb.put(lenArray[1]);
-                                    short finLength = (short) (bb.getShort(0) + 1);
-                                    byte[] tc = new byte[finLength];
+                                    short finLength = (short) (bb.getShort(0) + 1);*/
+                                    int lengthSec = length + SPI_LENGTH + ARC_LENGTH + TC_IV_LENGTH + MAC_LENGTH;
+                                    byte[] tc = new byte[lengthSec];
                                     System.arraycopy(frameHeader, 0, tc, 0, frameHeader.length);
                                     //TODO: assumes TC frame length includes header and trailer
-                                    for (int i = 5; i < finLength; i++) {
+                                    for (int i = 5; i < lengthSec; i++) {
                                         tc[i] = tcScanner.nextByte();
                                     }
                                     mainActor.tell(new GuardianActor.TC(tc));
@@ -246,14 +269,14 @@ public class Main {
                 }
                 //e.printStackTrace();
             } finally {
-                if (tmIn != null) {
+                /*if (tmIn != null) {
                     try {
                         tmIn.close();
                     } catch (IOException e) {
                         System.out.println("Can't close socket for TM input");
                         e.printStackTrace();
                     }
-                }
+                }*/
                 if (tcIn != null) {
                     try {
                         tcIn.close();
@@ -278,14 +301,14 @@ public class Main {
                         e.printStackTrace();
                     }
                 }
-                if (tcOut != null) {
+                /*if (tcOut != null) {
                     try {
                         tcOut.close();
                     } catch (IOException e) {
                         System.out.println("Can't close socket for TC output");
                         e.printStackTrace();
                     }
-                }
+                }*/
                 if (pduOut != null) {
                     try {
                         pduOut.close();

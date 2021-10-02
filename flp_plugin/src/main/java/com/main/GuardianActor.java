@@ -7,6 +7,7 @@ import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 
+import java.io.File;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
@@ -33,11 +34,11 @@ public class GuardianActor extends AbstractBehavior<GuardianActor.Command> {
         //final List<Short> standardSA2;
         //final Map<Short, Boolean> saToCritical2;
         final OutputStream tmStream;
-        final OutputStream tcStream;
+        final File tcStream;
         final OutputStream pduStream;
 
 
-        public Start(int active1, Map<Byte, byte[]> defKeys1, Map<Byte, byte[]> sessionKeys1, Map<Integer, Short> vcToDefaultSA1, Map<Short, Byte> criticalSA1, List<Short> standardSA1, OutputStream tmStream, OutputStream tcStream, OutputStream pduStream) {
+        public Start(int active1, Map<Byte, byte[]> defKeys1, Map<Byte, byte[]> sessionKeys1, Map<Integer, Short> vcToDefaultSA1, Map<Short, Byte> criticalSA1, List<Short> standardSA1, OutputStream tmStream, File tcStream, OutputStream pduStream) {
             this.active1 = active1;
             this.masterKeys = defKeys1;
             this.vcToDefaultSA1 = vcToDefaultSA1;
