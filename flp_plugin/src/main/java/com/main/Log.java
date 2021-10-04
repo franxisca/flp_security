@@ -101,7 +101,7 @@ public class Log extends AbstractBehavior<Log.Command> {
     private Behavior<Command> onErase(EraseLog e) {
         int number = this.entries.size();
         this.entries.clear();
-        //TODO: remaining space?
+        //remaining space?
         //for now just use all ones byte
         byte rem = (byte) 0b11111111;
         e.replyTo.tell(new PDUManager.EraseLogReply(number, rem, e.secMan));

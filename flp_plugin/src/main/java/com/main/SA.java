@@ -315,7 +315,6 @@ public class SA extends AbstractBehavior<SA.Command> {
             this.keyActor =r.keyActor;
             this.state = SAState.KEYED;
             this.prevState = SAState.UNKEYED;
-            //TODO: ask if arc isn't just reset to 0
             this.aRC = r.arc;
             this.iV = r.iv;
             //log success

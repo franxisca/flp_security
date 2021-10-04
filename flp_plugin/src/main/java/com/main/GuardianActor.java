@@ -17,28 +17,20 @@ public class GuardianActor extends AbstractBehavior<GuardianActor.Command> {
     public interface Command {}
 
     public static final class Start implements Command {
-        //TODO: more initial parameters?
+        //TODO: make configurable
         final int active1;
-        //final int active2;
-        //lets just do it
         final Map<Byte, byte[]> masterKeys;
-        //final Map<Byte, byte[]> masterKeys2;
         final Map<Byte, byte[]> sessionKeys;
-        //final Map<Byte, byte[]> sessionKeys2;
         final Map<Integer, Short> vcToDefaultSA1;
-        //final Map<Integer, Short> vcToDefaultSA2;
-        //final Map<Short, Boolean> saToCritical1;
         final Map<Short, Byte> criticalSA1;
-        //final Map<Short, Byte> criticalSA2;
         final List<Short> standardSA1;
-        //final List<Short> standardSA2;
-        //final Map<Short, Boolean> saToCritical2;
         final OutputStream tmStream;
         final File tcStream;
+        final File fsr;
         final OutputStream pduStream;
 
 
-        public Start(int active1, Map<Byte, byte[]> defKeys1, Map<Byte, byte[]> sessionKeys1, Map<Integer, Short> vcToDefaultSA1, Map<Short, Byte> criticalSA1, List<Short> standardSA1, OutputStream tmStream, File tcStream, OutputStream pduStream) {
+        public Start(int active1, Map<Byte, byte[]> defKeys1, Map<Byte, byte[]> sessionKeys1, Map<Integer, Short> vcToDefaultSA1, Map<Short, Byte> criticalSA1, List<Short> standardSA1, OutputStream tmStream, File tcStream, File fsrOut, OutputStream pduStream) {
             this.active1 = active1;
             this.masterKeys = defKeys1;
             this.vcToDefaultSA1 = vcToDefaultSA1;
@@ -47,6 +39,7 @@ public class GuardianActor extends AbstractBehavior<GuardianActor.Command> {
             this.sessionKeys = sessionKeys1;
             this.tmStream = tmStream;
             this.tcStream = tcStream;
+            this.fsr = fsrOut;
             this.pduStream = pduStream;
         }
     }
@@ -98,11 +91,10 @@ public class GuardianActor extends AbstractBehavior<GuardianActor.Command> {
     }
 
     private Behavior<Command> onStart(Start s) {
-        //TODO: enable IO
         ActorRef<PDUOutstream.Command> pduOut = getContext().spawn(PDUOutstream.create(s.pduStream), "pdu-output-stream");
         ActorRef<TMOutStream.Command> tmOut = getContext().spawn(TMOutStream.create(s.tmStream), "tm-output-stream");
         ActorRef<TCOutstream.Command> tcOut = getContext().spawn(TCOutstream.create(s.tcStream), "tc-output-stream");
-        ActorRef<Module.Command> module1 = getContext().spawn(Module.create(pduOut, s.active1, tmOut, tcOut, getContext().getSelf()), "module-1");
+        ActorRef<Module.Command> module1 = getContext().spawn(Module.create(pduOut, s.active1, tmOut, tcOut, getContext().getSelf(), s.fsr), "module-1");
         this.module = module1;
         module1.tell(new Module.InitSA(s.criticalSA1, s.standardSA1));
         module1.tell(new Module.DefaultSA(s.vcToDefaultSA1));

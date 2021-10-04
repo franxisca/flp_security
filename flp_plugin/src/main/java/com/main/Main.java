@@ -16,10 +16,8 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-//TODO: iv length 16
+//TODO: iv length 12
 //TODO: increment not on least 4 significant bytes
-//TODO: key verification 12 byte 0
-//TODO: TC output
 //TODO: TM input
 
 
@@ -43,11 +41,10 @@ public class Main {
     public static final int chunckLengthInByte = 10;
     public static final int stringLengtthEncodingInByte = 2;
 
-    //TODO
-    public static final int TC_IV_LENGTH = 16;
-    public static final int SPI_LENGTH = 2;
-    public static final int ARC_LENGTH = 4;
-    public static final int MAC_LENGTH = 16;
+    private static final int TC_IV_LENGTH = 12;
+    private static final int SPI_LENGTH = 2;
+    private static final int ARC_LENGTH = 4;
+    private static final int MAC_LENGTH = 16;
 
     public static void main(String[] args) {
 
@@ -66,6 +63,7 @@ public class Main {
 
         }*/
         File tcOut = new File("tc-output");
+        File fsrOut = new File("fsr-output");
         /*try {
             FileWriter tcWriter = new FileWriter(tcOut);
         }
@@ -100,7 +98,7 @@ public class Main {
                 Map<Integer, Short> vcToSA = getVC();
                 Map<Short, Byte> criticalSA = criticalSAs();
                 List<Short> standardSA = standardSAs();
-                mainActor.tell(new GuardianActor.Start(active, masterKeys, sessionKeys, vcToSA, criticalSA, standardSA, tmOutStream, tcOut, pduOutStream));
+                mainActor.tell(new GuardianActor.Start(active, masterKeys, sessionKeys, vcToSA, criticalSA, standardSA, tmOutStream, tcOut, fsrOut, pduOutStream));
                 try {
                     //maybe find a different solution than timeout until initialization is finished
                     Thread.sleep(5000);
@@ -125,36 +123,18 @@ public class Main {
                         public void run() {
                             while (true) {
                                 while (tcScanner.hasNextByte()) {
-                                    //TODO: scan tc according to length
+                                    //maybe that's broken
                                     byte[] frameHeader = new byte[5];
                                     for (int i = 0; i < 5; i++) {
                                         frameHeader[i] = tcScanner.nextByte();
                                     }
                                     byte firstLen = (byte) (frameHeader[2] & (byte) 0b00000011);
                                     int first = firstLen << 8;
-                                    int length = first + frameHeader[3] + 1;
-                                    /*BitSet header = BitSet.valueOf(frameHeader);
-                                    BitSet length = header.get(22, 32);
-                                    BitSet augLength = new BitSet(16);
-                                    for (int i = 0; i < 6; i++) {
-                                        augLength.clear(i);
-                                    }
-                                    int j = 0;
-                                    for (int i = 6; i < 16; i++) {
-                                        if (length.get(j)) {
-                                            augLength.set(i);
-                                        }
-                                        j++;
-                                    }
-                                    byte[] lenArray = augLength.toByteArray();
-                                    ByteBuffer bb = ByteBuffer.allocate(2);
-                                    bb.put(lenArray[0]);
-                                    bb.put(lenArray[1]);
-                                    short finLength = (short) (bb.getShort(0) + 1);*/
+                                    int length = first + (int) (frameHeader[3]) + 1;
                                     int lengthSec = length + SPI_LENGTH + ARC_LENGTH + TC_IV_LENGTH + MAC_LENGTH;
                                     byte[] tc = new byte[lengthSec];
                                     System.arraycopy(frameHeader, 0, tc, 0, frameHeader.length);
-                                    //TODO: assumes TC frame length includes header and trailer
+                                    //assumes TC frame length includes header and trailer
                                     for (int i = 5; i < lengthSec; i++) {
                                         tc[i] = tcScanner.nextByte();
                                     }
@@ -412,7 +392,6 @@ public class Main {
         mainActor.tell(new GuardianActor.PDU(pdu));
     }
 
-   //TODO: assumes iv length x (see constant), tag length 128
     private static void testOtar(ActorSystem<GuardianActor.Command> mainActor) {
         byte[] pdu = new byte[4 + OTAR_IV_LENGTH + 1 + 32 + 16];
         pdu[0] = (byte) 0b00000001;
@@ -477,10 +456,6 @@ public class Main {
     private static byte[] decrypt(byte[] cipherText, byte[] masterKey, byte[] iv) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         SecretKey secretKey = new SecretKeySpec(masterKey, "AES");
-        /*byte[] cipherText = new byte[keys.length + mac.length];
-        System.arraycopy(keys, 0, cipherText, 0, keys.length);
-        System.arraycopy(mac, 0, cipherText, keys.length, mac.length);*/
-        //TODO: check tag length
         GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
         cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmParameterSpec);
         return cipher.doFinal(cipherText);

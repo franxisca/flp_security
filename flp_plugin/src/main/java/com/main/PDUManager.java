@@ -18,6 +18,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     public interface Command {}
 
+    private static final int IV_LENGTH = 12;
 
     //works
     public static final class KeyDestruction implements Command {
@@ -76,7 +77,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     }
 
     //should work
-    //TODO: spec says answer shall contain 2 bytes keyid, 2 bytes truncated MAC of 128 bit length
+    //return is according to standard not to specification
     public static final class KeyVerification implements Command{
         final byte[] value;
         final ActorRef<KeyManager.Command> replyTo;
@@ -436,25 +437,14 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     //should work
     private Behavior<Command> onOtar(Otar o) {
+        //TODO
         byte masterKey = o.value[0];
-        byte[] iv = new byte[12];
-        for (int i = 0; i < 12; i++) {
+        byte[] iv = new byte[IV_LENGTH];
+        for (int i = 0; i < iv.length; i++) {
             iv[i] = o.value[i+1];
         }
-        /*byte[] mac = new byte[16];
-        byte[] keys = new byte[o.value.length - (1+12+16)];
-        int i = 1;
-        for (int j = 15; j >= 0; j--) {
-            mac[j] = o.value[o.value.length-i];
-            i++;
-        }
-        int k = 13;
-        for (int j = 0; j < (o.value.length - 29); j++) {
-            keys[j] = o.value[k];
-            k++;
-        }*/
         byte[] cipherText = new byte[o.value.length - (iv.length + 1)];
-        System.arraycopy(o.value, 13, cipherText, 0, cipherText.length);
+        System.arraycopy(o.value, (IV_LENGTH + 1), cipherText, 0, cipherText.length);
         o.replyTo.tell(new KeyManager.OTAR(masterKey, iv,cipherText, o.log));
         return this;
     }
@@ -743,11 +733,16 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         for(Map.Entry<Byte, byte[]> entry : k.reply.entrySet()) {
             length++;
             length = (short) (length + entry.getValue().length);
+            length = (short) (length + IV_LENGTH);
         }
         ArrayList<Byte> temp = new ArrayList<>();
         byte[] value = new byte[length];
         for(Map.Entry<Byte, byte[]> entry : k.reply.entrySet()) {
             temp.add(entry.getKey());
+            for(int i = 0; i < IV_LENGTH; i++) {
+                byte zero = 0;
+                temp.add(zero);
+            }
             for(int i = 0; i < entry.getValue().length; i++) {
                 temp.add(entry.getValue()[i]);
             }

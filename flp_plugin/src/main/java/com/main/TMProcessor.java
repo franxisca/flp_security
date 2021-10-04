@@ -140,7 +140,6 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
         return this;
     }
 
-    //TODO: check for tag length
     private static byte[] encrypt(byte[] key, byte[] iv, byte[] data) throws Exception {
 
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");

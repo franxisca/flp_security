@@ -17,6 +17,8 @@ import java.util.Map;
 
 public class Key extends AbstractBehavior<Key.Command> {
 
+    private static final int IV_LENGTH = 12;
+
     public interface Command {}
 
     public static final class GetKey implements Command, KeyManager.Command {
@@ -371,16 +373,11 @@ public class Key extends AbstractBehavior<Key.Command> {
         return this;
     }
 
-    //TODO: check if it works
+    //should work
     private static byte[] encrypt(byte[] challenge, byte[] key) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         SecretKey secretKey = new SecretKeySpec(key, "AES");
-        byte[] iv = new byte[2];
-        /*for(int i = 0; i < 2; i++) {
-            iv[i] = 0;
-        }*/
-        /*iv[0] = 0;
-        iv[1] = 0;*/
+        byte[] iv = new byte[IV_LENGTH];
         GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmParameterSpec);
         return cipher.doFinal(challenge);

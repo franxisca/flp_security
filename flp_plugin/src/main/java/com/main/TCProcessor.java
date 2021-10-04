@@ -197,7 +197,6 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
     }
 
     //authentication bitmask is not handled but is all ones anyway
-    //TODO: check if decryption works that way
     private static byte[] decrypt(byte[] key, byte[] iv, byte[] data, byte[] tag, byte[] authMask) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         SecretKey secretKey = new SecretKeySpec(key, "AES");

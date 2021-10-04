@@ -7,12 +7,20 @@ import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
 
 public class Module extends AbstractBehavior<Module.Command> {
 
     public interface Command {}
+
+    private static final int IV_LENGTH = 12;
+    private static final int SPI_LENGTTH = 2;
+    private static final int ARC_LENGTH = 4;
+    private static final int TAG_LENGTH = 16;
 
     public static final class GetTCInfo implements Command {
 
@@ -209,8 +217,8 @@ public class Module extends AbstractBehavior<Module.Command> {
         }
     }
 
-    public static Behavior<Command> create(ActorRef<PDUOutstream.Command> pduOut, int activeKeys, ActorRef<TMOutStream.Command> tmOut, ActorRef<TCOutstream.Command> tcOut, ActorRef<GuardianActor.Command> parent) {
-        return Behaviors.setup(context -> new Module(context, pduOut, activeKeys, tmOut, tcOut, parent));
+    public static Behavior<Command> create(ActorRef<PDUOutstream.Command> pduOut, int activeKeys, ActorRef<TMOutStream.Command> tmOut, ActorRef<TCOutstream.Command> tcOut, ActorRef<GuardianActor.Command> parent, File fsr) {
+        return Behaviors.setup(context -> new Module(context, pduOut, activeKeys, tmOut, tcOut, parent, fsr));
     }
 
     private final ActorRef<SecurityManager.Command> secMan;
@@ -223,8 +231,9 @@ public class Module extends AbstractBehavior<Module.Command> {
     private final ActorRef<TMProcessor.Command> tmProc;
     private Map<Integer, Short> vcIdToDefaultSA = new HashMap<>();
     private final ActorRef<GuardianActor.Command> parent;
+    private final File fsr;
 
-    private Module(ActorContext<Command> context, ActorRef<PDUOutstream.Command> pduOut, int activeKeys, ActorRef<TMOutStream.Command> tmOut, ActorRef<TCOutstream.Command> tcOut, ActorRef<GuardianActor.Command> parent) {
+    private Module(ActorContext<Command> context, ActorRef<PDUOutstream.Command> pduOut, int activeKeys, ActorRef<TMOutStream.Command> tmOut, ActorRef<TCOutstream.Command> tcOut, ActorRef<GuardianActor.Command> parent, File fsr) {
         super(context);
         this.secMan = getContext().spawn(SecurityManager.create(getContext().getSelf(), activeKeys), "secMan");
         this.pduOut = pduOut;
@@ -234,6 +243,7 @@ public class Module extends AbstractBehavior<Module.Command> {
         this.tmOut = tmOut;
         this.tcOut = tcOut;
         this.parent = parent;
+        this.fsr = fsr;
     }
 
     @Override
@@ -306,16 +316,15 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onTCIn(TCIn tc) {
         byte[] frameHeader = new byte[5];
-        //TODO: security header length
-        byte[] secHeader = new byte[18];
-        byte[] secTrailer = new byte[16];
+        byte[] secHeader = new byte[IV_LENGTH + SPI_LENGTTH + ARC_LENGTH];
+        byte[] secTrailer = new byte[TAG_LENGTH];
         byte[] crc = new byte[2];
-        int dataLength = tc.tc.length - (5+18+16+2);
+        int dataLength = tc.tc.length - (frameHeader.length + secHeader.length + secTrailer.length + 2);
         byte[] data = new byte[dataLength];
         System.arraycopy(tc.tc, 0, frameHeader, 0, 5);
-        System.arraycopy(tc.tc, 5, secHeader, 0, 18);
-        System.arraycopy(tc.tc, 23, data, 0, dataLength);
-        System.arraycopy(tc.tc, (23+dataLength), secTrailer, 0, 16);
+        System.arraycopy(tc.tc, frameHeader.length, secHeader, 0, 18);
+        System.arraycopy(tc.tc, (frameHeader.length + secHeader.length), data, 0, dataLength);
+        System.arraycopy(tc.tc, (frameHeader.length + secHeader.length + dataLength), secTrailer, 0, 16);
         System.arraycopy(tc.tc, tc.tc.length - 2, crc, 0, 2);
         this.tcProc.tell(new TCProcessor.EncryptedTC(frameHeader, secHeader, data, dataLength, secTrailer, crc, getContext().getSelf()));
         return this;
@@ -426,7 +435,36 @@ public class Module extends AbstractBehavior<Module.Command> {
     }
 
     private Behavior<Command> onFSR(FSR fsr) {
-        //TODO
+        try {
+            FileWriter writer = new FileWriter(this.fsr);
+            byte firstByte = (byte) 0b11000000;
+            byte alarmFlag = 0;
+            if(fsr.alarmFlag) {
+                alarmFlag = (byte) 0b00001000;
+            }
+            byte badSN = 0;
+            if(fsr.badSN) {
+                badSN = (byte) 0b00000100;
+            }
+            byte badMAC = 0;
+            if(fsr.badMAC) {
+                badMAC = (byte) 0b00000010;
+            }
+            byte badSA = 0;
+            if(fsr.badSA) {
+                badSA = (byte) 0b00000001;
+            }
+            firstByte = (byte) (firstByte | alarmFlag | badSN | badMAC | badSA);
+            byte[] report = new byte[4];
+            report[0] = firstByte;
+            report[2] = (byte) (fsr.lastSpi & 0xff);
+            report[1] = (byte) ((fsr.lastSpi >> 8) & 0xff);
+            report[3] = fsr.lastSN;
+            writer.write(Arrays.toString(report));
+        }
+        catch (IOException e) {
+            System.out.println("Could not write to file for fsr output..");
+        }
         return this;
     }
 }

@@ -322,7 +322,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
     private Behavior<Command> onDecOtar(DecOtar d) {
 
         //decryption worked
-        //TODO: assumes decryption returns plain text only
+        //assumes decryption returns plain text only
         try {
             System.out.println("got master key");
             System.out.println(Arrays.toString(d.masterKey));
@@ -375,14 +375,10 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         return this;
     }
 
-    //TODO: check if that works, does tag need to be appended to ciphertext?
+    //tag is appended to ciphertext for decryption
     private static byte[] decrypt(byte[] cipherText, byte[] masterKey, byte[] iv) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         SecretKey secretKey = new SecretKeySpec(masterKey, "AES");
-        /*byte[] cipherText = new byte[keys.length + mac.length];
-        System.arraycopy(keys, 0, cipherText, 0, keys.length);
-        System.arraycopy(mac, 0, cipherText, keys.length, mac.length);*/
-        //TODO: check tag length
         GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
         cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmParameterSpec);
         return cipher.doFinal(cipherText);
