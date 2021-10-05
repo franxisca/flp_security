@@ -3,9 +3,11 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '4.0.2'
 }
 
+
 apply plugin: 'java'
 apply plugin: 'idea'
 apply plugin: 'application'
+
 
 mainClassName = "com.main.Main"
 

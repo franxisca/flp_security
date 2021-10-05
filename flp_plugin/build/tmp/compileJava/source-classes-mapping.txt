@@ -37,8 +37,6 @@ com/main/Key.java
  com.main.Key$Verify
 com/main/Main.java
  com.main.Main
- com.main.Main$1
- com.main.Main$2
 com/main/SA.java
  com.main.SA
  com.main.SA$ArcIncrement
@@ -143,6 +141,8 @@ com/main/KeyManager.java
 com/main/LogEntry.java
  com.main.LogEntry
  com.main.LogEntry$Command
+com/main/PDUThread.java
+ com.main.PDUThread
 com/main/TMProcessor.java
  com.main.TMProcessor
  com.main.TMProcessor$Command
@@ -196,3 +196,5 @@ com/main/SAManager.java
  com.main.SAManager$StatusRequest
  com.main.SAManager$Stop
  com.main.SAManager$Verify
+com/main/TCThread.java
+ com.main.TCThread

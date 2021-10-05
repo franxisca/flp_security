@@ -272,8 +272,10 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
     private Behavior<Command> onPDUReply(PDUReply p) {
         final byte[] reply = new byte[p.length + 3];
         reply[0] = p.tag;
-        reply[2] = (byte) (p.length & 0xff);
-        reply[1] = (byte) ((p.length >> 8) & 0xff);
+        //length needs to be provided in bits
+        short lengthBits = (short) (p.length * 8);
+        reply[2] = (byte) (lengthBits & 0xff);
+        reply[1] = (byte) ((lengthBits >> 8) & 0xff);
         System.arraycopy(p.value, 0, reply, 3, p.length);
         this.parent.tell(new Module.PDUOut(reply));
         return this;

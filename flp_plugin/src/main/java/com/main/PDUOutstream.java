@@ -41,11 +41,10 @@ public class PDUOutstream extends AbstractBehavior<PDUOutstream.Command> {
 
     private Behavior<Command> onPDU(PDU pdu) {
         try {
-            for (int i = 0; i < pdu.pduReply.length; i++) {
-                this.stream.write(pdu.pduReply[i]);
-            }
+            this.stream.write(pdu.pduReply);
         }
         catch (IOException e) {
+            System.out.println("Could not send PDU reply..");
             e.printStackTrace();
         }
         return this;

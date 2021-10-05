@@ -16,6 +16,8 @@ public class GuardianActor extends AbstractBehavior<GuardianActor.Command> {
 
     public interface Command {}
 
+    private static int i = 0;
+
     public static final class Start implements Command {
         //TODO: make configurable
         final int active1;
@@ -91,10 +93,14 @@ public class GuardianActor extends AbstractBehavior<GuardianActor.Command> {
     }
 
     private Behavior<Command> onStart(Start s) {
-        ActorRef<PDUOutstream.Command> pduOut = getContext().spawn(PDUOutstream.create(s.pduStream), "pdu-output-stream");
-        ActorRef<TMOutStream.Command> tmOut = getContext().spawn(TMOutStream.create(s.tmStream), "tm-output-stream");
-        ActorRef<TCOutstream.Command> tcOut = getContext().spawn(TCOutstream.create(s.tcStream), "tc-output-stream");
-        ActorRef<Module.Command> module1 = getContext().spawn(Module.create(pduOut, s.active1, tmOut, tcOut, getContext().getSelf(), s.fsr), "module-1");
+        ActorRef<PDUOutstream.Command> pduOut = getContext().spawn(PDUOutstream.create(s.pduStream), "pdu-output-stream" + i);
+        i++;
+        ActorRef<TMOutStream.Command> tmOut = getContext().spawn(TMOutStream.create(s.tmStream), "tm-output-stream" + i);
+        i++;
+        ActorRef<TCOutstream.Command> tcOut = getContext().spawn(TCOutstream.create(s.tcStream), "tc-output-stream" + i);
+        i++;
+        ActorRef<Module.Command> module1 = getContext().spawn(Module.create(pduOut, s.active1, tmOut, tcOut, getContext().getSelf(), s.fsr), "module-1" + i);
+        i++;
         this.module = module1;
         module1.tell(new Module.InitSA(s.criticalSA1, s.standardSA1));
         module1.tell(new Module.DefaultSA(s.vcToDefaultSA1));
