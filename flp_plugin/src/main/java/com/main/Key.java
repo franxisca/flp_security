@@ -334,13 +334,14 @@ public class Key extends AbstractBehavior<Key.Command> {
 
     private Behavior<Command> onTC(GetTCInfo tc) {
         //keyActor is not ACTIVE, should not happen
-        if(this.keyState != KeyState.ACTIVE) {
-            tc.tcProc.tell(new TCProcessor.BadSA(tc.sPi, tc.secHeader, tc.parent));
-        }
+        //TODO
+        /*if(this.keyState != KeyState.ACTIVE) {
+            tc.tcProc.tell(new TCProcessor.BadSA(tc.sPi, tc.secHeader, tc.parent, 13));
+        }*/
         //return keyActor to TCProcessor
-        else {
+        //else {
             tc.tcProc.tell(new TCProcessor.TC(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.arc, tc.authMask, tc.parent, this.keyId, this.key, tc.sPi));
-        }
+        //}
         return this;
     }
 

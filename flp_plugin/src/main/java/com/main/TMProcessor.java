@@ -105,7 +105,12 @@ public class TMProcessor extends AbstractBehavior<TMProcessor.Command> {
         System.arraycopy(tm.frameHeader, 0, plaintext, 0, tm.frameHeader.length);
         System.arraycopy(tm.data, 0, plaintext, tm.frameHeader.length, tm.data.length);
         try {
-            byte[] ciphertext = encrypt(tm.key, tm.iv, plaintext);
+            byte[] ivFin = new byte[16];
+            System.arraycopy(tm.iv, 0, ivFin, 0, tm.iv.length);
+            for(int i = 12; i < ivFin.length; i++) {
+                ivFin[i] = 0;
+            }
+            byte[] ciphertext = encrypt(tm.key, ivFin, plaintext);
             byte[] toReturn = new byte[secHeader.length + ciphertext.length + tm.trailer.length];
             System.arraycopy(secHeader, 0, toReturn, 0, secHeader.length);
             System.arraycopy(ciphertext, 0, toReturn, secHeader.length, ciphertext.length);

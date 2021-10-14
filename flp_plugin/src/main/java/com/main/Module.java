@@ -78,11 +78,13 @@ public class Module extends AbstractBehavior<Module.Command> {
         final boolean verificationStatus;
         final byte verStatCode;
         final byte[] secReturn;
+        final byte[] crc;
 
-        public TCOut(boolean verificationStatus, byte verStatCode, byte[] secReturn) {
+        public TCOut(boolean verificationStatus, byte verStatCode, byte[] secReturn, byte[] crc) {
             this.verificationStatus = verificationStatus;
             this.verStatCode = verStatCode;
             this.secReturn = secReturn;
+            this.crc = crc;
         }
     }
 
@@ -315,13 +317,13 @@ public class Module extends AbstractBehavior<Module.Command> {
     }
 
     private Behavior<Command> onTCIn(TCIn tc) {
-        byte[] frameHeader = new byte[5];
+        byte[] frameHeader = new byte[6];
         byte[] secHeader = new byte[IV_LENGTH + SPI_LENGTTH + ARC_LENGTH];
         byte[] secTrailer = new byte[TAG_LENGTH];
         byte[] crc = new byte[2];
         int dataLength = tc.tc.length - (frameHeader.length + secHeader.length + secTrailer.length + 2);
         byte[] data = new byte[dataLength];
-        System.arraycopy(tc.tc, 0, frameHeader, 0, 5);
+        System.arraycopy(tc.tc, 0, frameHeader, 0, 6);
         System.arraycopy(tc.tc, frameHeader.length, secHeader, 0, 18);
         System.arraycopy(tc.tc, (frameHeader.length + secHeader.length), data, 0, dataLength);
         System.arraycopy(tc.tc, (frameHeader.length + secHeader.length + dataLength), secTrailer, 0, 16);
@@ -332,11 +334,23 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onTCOut(TCOut tc) {
         //TODO
-        /*System.out.println(tc.verificationStatus);
+        System.out.println(tc.verificationStatus);
         System.out.println(tc.verStatCode);
-        System.out.println(Arrays.toString(tc.secReturn));*/
+        //System.out.println(Arrays.toString(tc.secReturn));
+        byte[] ret = new byte[tc.secReturn.length + tc.crc.length];
+        System.arraycopy(tc.secReturn, 0, ret, 0, tc.secReturn.length);
+        System.arraycopy(tc.crc, 0, ret, tc.secReturn.length, tc.crc.length);
+        System.out.println(toHex(ret));
         this.tcOut.tell(new TCOutstream.TC(tc.verificationStatus, tc.verStatCode, tc.secReturn));
         return this;
+    }
+
+    private String toHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for(byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
     }
 
     private Behavior<Command> onTMIn(TMIn tm) {

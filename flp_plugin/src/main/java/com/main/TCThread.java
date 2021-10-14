@@ -22,40 +22,42 @@ public class TCThread extends Thread {
     }
 
     public void run() {
-        try {
-            int tcData = this.stream.read();
-            if (tcData != -1) {
-                byte first = (byte) tcData;
-                byte[] rest = this.stream.readNBytes(4);
-                byte[] frameHeader = new byte[5];
-                frameHeader[0] = first;
-                System.arraycopy(rest, 0, frameHeader, 1, 4);
-                byte firstLen = (byte) (frameHeader[2] & (byte) 0b00000011);
-                int firstLength = firstLen << 8;
-                int length = firstLength + (int) (frameHeader[3]) + 1;
-                //length is provided in bits
-                int lengthByte = length / 8;
+        while (true) {
+            try {
+                int tcData = this.stream.read();
+                if (tcData != -1) {
+                    byte first = (byte) tcData;
+                    //TODO: header length
+                    byte[] rest = this.stream.readNBytes(5);
+                    byte[] frameHeader = new byte[6];
+                    frameHeader[0] = first;
+                    System.arraycopy(rest, 0, frameHeader, 1, 5);
+                    byte firstLen = (byte) (frameHeader[2] & (byte) 0b00000011);
+                    int firstLength = firstLen << 8;
+                    int length = firstLength + ((int) (frameHeader[3])) + 1;
+                    //length is provided in bytes
+                /*int lengthByte = length / 8;
                 if((length % 8) != 0) {
                     lengthByte++;
+                }*/
+                    //System.out.println("TC frame length:");
+                    int lengthSec = length + SPI_LENGTH + ARC_LENGTH + TC_IV_LENGTH + MAC_LENGTH;
+                    byte[] tc = new byte[lengthSec];
+                    System.arraycopy(frameHeader, 0, tc, 0, frameHeader.length);
+                    byte[] frame = this.stream.readNBytes(lengthSec - frameHeader.length);
+                    System.arraycopy(frame, 0, tc, frameHeader.length, frame.length);
+                    System.out.println("Received TC");
+                    System.out.println("Length: " + lengthSec);
+                    System.out.println(Arrays.toString(tc));
+                    mainActor.tell(new GuardianActor.TC(tc));
+                    //assumes TC frame length includes header and trailer
+                    Thread.sleep(5000);
                 }
-                int lengthSec = lengthByte + SPI_LENGTH + ARC_LENGTH + TC_IV_LENGTH + MAC_LENGTH;
-                byte[] tc = new byte[lengthSec];
-                System.arraycopy(frameHeader, 0, tc, 0, frameHeader.length);
-                byte[] frame = this.stream.readNBytes(lengthSec - 5);
-                System.arraycopy(frame, 0, tc, 5, frame.length);
-                System.out.println("Received TC");
-                System.out.println("Length: " + lengthSec);
-                System.out.println(Arrays.toString(tc));
-                mainActor.tell(new GuardianActor.TC(tc));
-                //assumes TC frame length includes header and trailer
-                Thread.sleep(5000);
+            } catch (IOException e) {
+                System.out.println("Could not read from TC input stream...");
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        }
-        catch (IOException e) {
-            System.out.println("Could not read from TC input stream...");
-        }
-        catch (Exception e) {
-            e.printStackTrace();
         }
 
     }

@@ -437,7 +437,7 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
 
     //should work
     private Behavior<Command> onOtar(Otar o) {
-        //TODO
+        //TODO: what exactly is to do here?
         byte masterKey = o.value[0];
         byte[] iv = new byte[IV_LENGTH];
         for (int i = 0; i < iv.length; i++) {

@@ -413,7 +413,7 @@ public class SAManager extends AbstractBehavior<SAManager.Command> {
     private Behavior<Command> onTC(GetTCInfo tc) {
         ActorRef<SA.Command> saActor = this.sPiToActor.get(tc.sPi);
         if(saActor == null) {
-            tc.tcProc.tell(new TCProcessor.BadSA(tc.sPi, tc.secHeader, tc.parent));
+            tc.tcProc.tell(new TCProcessor.BadSA(tc.sPi, tc.secHeader, tc.parent, 10));
         }
         else {
             saActor.tell(new SA.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, tc.keyMan));

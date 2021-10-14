@@ -17,7 +17,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 //TODO: iv length 12
-//TODO: increment not on least 4 significant bytes
+//TODO: increment not on least 4 significant bytes, append 4 0 bytes on each cipher use
 //TODO: TM input
 
 
@@ -36,6 +36,9 @@ public class Main {
     public static final int portSendEPReply = 8087;
     public static final int portSendError = 8088;
 
+    //TODO
+    private static final int portRequestTM = 1;
+
     public static final String hostName = "localhost";
 
     public static final int chunckLengthInByte = 10;
@@ -50,9 +53,11 @@ public class Main {
 
         Socket tcIn = null;
         Socket pduIn = null;
+        Socket tmIn = null;
 
         InputStream tcInstream = null;
         InputStream pduInstream = null;
+        InputStream tmInstrream = null;
         OutputStream tmOutStream = null;
         OutputStream pduOutStream = null;
 
@@ -62,12 +67,13 @@ public class Main {
         File fsrOut = new File("fsr-output");
         final ActorSystem<GuardianActor.Command> mainActor = ActorSystem.create(GuardianActor.create(), "guardian-actor");
 
-        while(tcIn == null || pduIn == null || tmOut == null || pduOut == null) {
+        while(tcIn == null || pduIn == null || tmOut == null || pduOut == null/* || tmIn == null*/) {
             try {
                 tcIn = new Socket(hostName, portSendProtectedTC);
                 pduIn = new Socket(hostName, portSendEPCommand);
                 tmOut = new Socket(hostName, portReceiveProcetedTM);
                 pduOut = new Socket(hostName, portReceiveEPReply);
+                //tmIn = new Socket(hostName, portRequestTM);
             }
             catch (UnknownHostException e) {
                 System.out.println("Unknown Host...");
@@ -89,6 +95,7 @@ public class Main {
             pduInstream = pduIn.getInputStream();
             tmOutStream = tmOut.getOutputStream();
             pduOutStream = pduOut.getOutputStream();
+            //tmInstrream = tmIn.getInputStream();
             int active = 50;
             Map<Byte, byte[]> masterKeys = masterKeys();
             Map<Byte, byte[]> sessionKeys = sessionKeys();
@@ -102,12 +109,15 @@ public class Main {
             catch (Exception e) {
                 e.printStackTrace();
             }
-            while(true) {
-                PDUThread pduThread = new PDUThread(pduInstream, mainActor);
-                TCThread tcThread = new TCThread(tcInstream, mainActor);
-                pduThread.start();
-                tcThread.start();
-            }
+            /*PDUThread pduThread = new PDUThread(pduInstream, mainActor);
+            TCThread tcThread = new TCThread(tcInstream, mainActor);*/
+            PDUThread pduThread = new PDUThread(pduInstream, mainActor);
+            TCThread tcThread = new TCThread(tcInstream, mainActor);
+            //TMThread tmThread = new TMThread(tmInstrream, mainActor);
+            pduThread.start();
+            tcThread.start();
+            //tmThread.start();
+
         }
         catch (IOException e) {
             System.out.println("Could not get input/output streams...");
@@ -218,11 +228,11 @@ public class Main {
     private static Map<Short, Byte> criticalSAs() {
         Map<Short, Byte> temp = new HashMap<>();
         temp.put(getShort((byte) 0b00000000, (byte) 0b00000000), (byte) 0b00010100);
-        temp.put(getShort((byte) 0b00000000, (byte) 0b00000001), (byte) 0b00010110);
-        temp.put(getShort((byte) 0b00000000, (byte) 0b00000010), (byte) 0b00011000);
-        temp.put(getShort((byte) 0b00000000, (byte) 0b00000011), (byte) 0b00011010);
-        temp.put(getShort((byte) 0b00000000, (byte) 0b00000100), (byte) 0b00011100);
-        temp.put(getShort((byte) 0b00000000, (byte) 0b00000110), (byte) 0b00011110);
+        temp.put(getShort((byte) 0b00000000, (byte) 0b00000001), (byte) 0b00010101);
+        temp.put(getShort((byte) 0b00000000, (byte) 0b00000010), (byte) 0b00010110);
+        temp.put(getShort((byte) 0b00000000, (byte) 0b00000011), (byte) 0b00010111);
+        temp.put(getShort((byte) 0b00000000, (byte) 0b00000100), (byte) 0b00011000);
+        temp.put(getShort((byte) 0b00000000, (byte) 0b00000110), (byte) 0b00011001);
         return temp;
     }
 
@@ -505,7 +515,7 @@ public class Main {
         mainActor.tell(new GuardianActor.PDU(pdu));
     }
 
-    private static void testTM(ActorSystem<GuardianActor.Command> mainActor) {
+    public static void testTM(ActorSystem<GuardianActor.Command> mainActor) {
         /*try {
             System.out.println("test scanning tm");
             Scanner scanner = new Scanner(new File("TM_log.txt"));

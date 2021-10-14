@@ -17,6 +17,7 @@ import static akka.pattern.Patterns.pipe;
 
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
 
@@ -87,11 +88,13 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         final short sPi;
         final byte[] secHeader;
         final ActorRef<Module.Command> parent;
+        final int code;
 
-        public BadSA(short sPi, byte[] secHeader, ActorRef<Module.Command> parent) {
+        public BadSA(short sPi, byte[] secHeader, ActorRef<Module.Command> parent, int code) {
             this.sPi = sPi;
             this.secHeader = secHeader;
             this.parent = parent;
+            this.code = code;
         }
 
     }
@@ -130,6 +133,8 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         bb.put(tc.secHeader[0]);
         bb.put(tc.secHeader[1]);
         short sPi = bb.getShort(0);
+        System.out.println("Received SPI");
+        System.out.println(sPi);
         byte vc = tc.primHeader[2];
         //BitSet bits = BitSet.valueOf(vc);
         byte vcOnly = (byte) (vc & 0b11111100);
@@ -147,18 +152,25 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
                 vcId[9-i] = false;
             }
         }*/
-
-
+        System.out.println("Received MAC:");
+        System.out.println(Arrays.toString(tc.secTrailer));
         tc.parent.tell(new Module.GetTCInfo(sPi, vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, getContext().getSelf(), tc.parent));
         return this;
     }
 
     private Behavior<Command> onTC(TC tc) {
         byte[] plaintext;
-        byte[] iv = new byte[12];
+        byte[] iv = new byte[16];
         System.arraycopy(tc.secHeader, 6, iv, 0, 12);
+        for(int i = 12; i < iv.length; i++) {
+            iv[i] = 0;
+        }
+        //byte[] ivFin = new byte[16]
         try {
-            plaintext = decrypt(tc.key, iv, tc.data, tc.secTrailer, tc.authMask);
+            byte[] authOnly = new byte[tc.primHeader.length + tc.secHeader.length];
+            System.arraycopy(tc.primHeader, 0, authOnly, 0, tc.primHeader.length);
+            System.arraycopy(tc.secHeader, 0, authOnly, tc.primHeader.length, tc.secHeader.length);
+            plaintext = decrypt(tc.key, iv, tc.data, tc.secTrailer, tc.authMask, authOnly);
             byte[] c = new byte[4];
             System.arraycopy(tc.secHeader, 2, c, 0, 4);
             ByteBuffer bb = ByteBuffer.allocate(8);
@@ -175,11 +187,14 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
             if(tcArc <= saArc) {
                 //this.fsrHandler.tell(new FSRHandler.BadSeq());
                 this.alarmFlag = true;
-                tc.parent.tell(new Module.TCOut(true, (byte) 0b00000011, null));
+                tc.parent.tell(new Module.TCOut(false, (byte) 0b00000011, null, null));
                 tc.parent.tell(new Module.FSR(this.alarmFlag, true, false, false, tc.sPi, c[3]));
             }
             else {
-                tc.parent.tell(new Module.TCOut(false, (byte) 0b00000000, plaintext));
+                byte[] secReturn = new byte[tc.primHeader.length + plaintext.length];
+                System.arraycopy(tc.primHeader, 0, secReturn, 0, tc.primHeader.length);
+                System.arraycopy(plaintext, 0, secReturn, tc.primHeader.length, plaintext.length);
+                tc.parent.tell(new Module.TCOut(true, (byte) 0b00000000, secReturn, tc.crc));
                 tc.parent.tell(new Module.FSR(this.alarmFlag, false, false, false, tc.sPi, c[3]));
             }
 
@@ -189,7 +204,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
             System.arraycopy(tc.secHeader, 2, c, 0, 4);
             byte lastSN = c[3];
             this.alarmFlag = true;
-            tc.parent.tell(new Module.TCOut(true, (byte) 0b00000010, null));
+            tc.parent.tell(new Module.TCOut(false, (byte) 0b00000010, null, null));
             tc.parent.tell(new Module.FSR(this.alarmFlag, false, true, false, tc.sPi, lastSN));
            // this.fsrHandler.tell(new FSRHandler.BadMAC());
         }
@@ -197,14 +212,21 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
     }
 
     //authentication bitmask is not handled but is all ones anyway
-    private static byte[] decrypt(byte[] key, byte[] iv, byte[] data, byte[] tag, byte[] authMask) throws Exception {
+    private static byte[] decrypt(byte[] key, byte[] iv, byte[] data, byte[] tag, byte[] authMask, byte[] authOnly) throws Exception {
+        System.out.println("Decryption Key: " + Arrays.toString(key));
+        System.out.println("Decryption IV: " + Arrays.toString(iv));
+        System.out.println("Ciphertext: " + Arrays.toString(data));
+        System.out.println("MAC: " + Arrays.toString(tag));
+        System.out.println("Authenticated Data: " + Arrays.toString(authOnly));
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         SecretKey secretKey = new SecretKeySpec(key, "AES");
         byte[] cipherText = new byte[data.length + tag.length];
         System.arraycopy(data, 0, cipherText, 0, data.length);
+        //System.arraycopy(crc, 0, cipherText, data.length, crc.length);
         System.arraycopy(tag, 0, cipherText, data.length, tag.length);
         GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
         cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmParameterSpec);
+        cipher.updateAAD(authOnly);
         return cipher.doFinal(cipherText);
     }
 
@@ -215,8 +237,10 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         byte[] arc = new byte[4];
         System.arraycopy(b.secHeader, 2, arc, 0, 4);
         this.lastArc = arc[3];
-        b.parent.tell(new Module.TCOut(true, (byte) 0b00000001, null));
+        b.parent.tell(new Module.TCOut(false, (byte) 0b00000001, null, null));
         b.parent.tell(new Module.FSR(this.alarmFlag, false, false, true, b.sPi, this.lastArc));
+        System.out.println("Bad SA code");
+        System.out.println(b.code);
         return this;
     }
 

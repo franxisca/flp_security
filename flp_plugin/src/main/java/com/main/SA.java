@@ -339,7 +339,10 @@ public class SA extends AbstractBehavior<SA.Command> {
         else {
             byte tag = (byte) 0b10011001;
             this.keyId = -1;
-            this.keyActor.tell(new Key.NotUsed());
+            //TODO
+            if(this.keyActor != null) {
+                this.keyActor.tell(new Key.NotUsed());
+            }
             this.keyActor = null;
             this.state = SAState.UNKEYED;
             this.prevState = SAState.KEYED;
@@ -477,7 +480,7 @@ public class SA extends AbstractBehavior<SA.Command> {
     private Behavior<Command> onTC(GetTCInfo tc) {
         //SA not in the right state
         if(this.state != SAState.OPERATIONAL) {
-            tc.tcProc.tell(new TCProcessor.BadSA(this.sPi, tc.secHeader, tc.parent));
+            tc.tcProc.tell(new TCProcessor.BadSA(this.sPi, tc.secHeader, tc.parent, 11));
         }
         //SA not applied on channel
         //channel length fixed to 32 bits and stored as integer
@@ -497,9 +500,10 @@ public class SA extends AbstractBehavior<SA.Command> {
         System.arraycopy(chan, 0, channel, 3, 1);
         int channelInt = ByteBuffer.wrap(channel).getInt();*/
         //SA not applicable on channel
-        if(!this.channels.contains(tc.vcId)) {
+        //TODO
+        /*if(!this.channels.contains(tc.vcId)) {
             tc.tcProc.tell(new TCProcessor.BadSA(this.sPi, tc.secHeader, tc.parent));
-        }
+        }*/
         else {
             tc.keyMan.tell(new KeyManager.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, this.keyId, this.aRC, this.authBitMask, this.sPi));
         }

@@ -330,6 +330,8 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             System.out.println(Arrays.toString(d.iv));
             System.out.println("got ciphertext");
             System.out.println(Arrays.toString(d.cipherText));
+            byte[] iv = new byte[16];
+            System.arraycopy(d.iv, 0, iv, 0, d.iv.length);
             byte[] plain = decrypt(d.cipherText, d.masterKey, d.iv);
             System.out.println("try to decrypt");
             System.out.println(Arrays.toString(plain));
@@ -572,7 +574,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         ActorRef<Key.Command> keyActor = this.keyIdToActor.get(tc.keyId);
         //keyActor does not exist
         if(keyActor == null) {
-            tc.tcProc.tell(new TCProcessor.BadSA(tc.sPi, tc.secHeader, tc.parent));
+            tc.tcProc.tell(new TCProcessor.BadSA(tc.sPi, tc.secHeader, tc.parent, 12));
         }
         else {
             keyActor.tell(new Key.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, tc.arc, tc.authMask, tc.sPi));
