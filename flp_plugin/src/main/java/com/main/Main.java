@@ -37,7 +37,7 @@ public class Main {
     public static final int portSendError = 8088;
 
     //TODO
-    private static final int portRequestTM = 1;
+    private static final int portRequestTM = 8090;
 
     public static final String hostName = "localhost";
 
@@ -67,13 +67,13 @@ public class Main {
         File fsrOut = new File("fsr-output");
         final ActorSystem<GuardianActor.Command> mainActor = ActorSystem.create(GuardianActor.create(), "guardian-actor");
 
-        while(tcIn == null || pduIn == null || tmOut == null || pduOut == null/* || tmIn == null*/) {
+        while(tcIn == null || pduIn == null || tmOut == null || pduOut == null || tmIn == null) {
             try {
                 tcIn = new Socket(hostName, portSendProtectedTC);
                 pduIn = new Socket(hostName, portSendEPCommand);
                 tmOut = new Socket(hostName, portReceiveProcetedTM);
                 pduOut = new Socket(hostName, portReceiveEPReply);
-                //tmIn = new Socket(hostName, portRequestTM);
+                tmIn = new Socket(hostName, portRequestTM);
             }
             catch (UnknownHostException e) {
                 System.out.println("Unknown Host...");
@@ -95,7 +95,7 @@ public class Main {
             pduInstream = pduIn.getInputStream();
             tmOutStream = tmOut.getOutputStream();
             pduOutStream = pduOut.getOutputStream();
-            //tmInstrream = tmIn.getInputStream();
+            tmInstrream = tmIn.getInputStream();
             int active = 50;
             Map<Byte, byte[]> masterKeys = masterKeys();
             Map<Byte, byte[]> sessionKeys = sessionKeys();
@@ -113,10 +113,10 @@ public class Main {
             TCThread tcThread = new TCThread(tcInstream, mainActor);*/
             PDUThread pduThread = new PDUThread(pduInstream, mainActor);
             TCThread tcThread = new TCThread(tcInstream, mainActor);
-            //TMThread tmThread = new TMThread(tmInstrream, mainActor);
+            TMThread tmThread = new TMThread(tmInstrream, mainActor);
             pduThread.start();
             tcThread.start();
-            //tmThread.start();
+            tmThread.start();
 
         }
         catch (IOException e) {
