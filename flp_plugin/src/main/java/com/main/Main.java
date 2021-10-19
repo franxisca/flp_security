@@ -11,6 +11,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -37,7 +38,7 @@ public class Main {
     public static final int portSendError = 8088;
 
     //TODO
-    private static final int portRequestTM = 8090;
+    public static final int portRequestTM = 8090;
 
     public static final String hostName = "localhost";
 
@@ -53,7 +54,7 @@ public class Main {
 
         Socket tcIn = null;
         Socket pduIn = null;
-        Socket tmIn = null;
+        ServerSocket tmIn = null;
 
         InputStream tcInstream = null;
         InputStream pduInstream = null;
@@ -73,7 +74,8 @@ public class Main {
                 pduIn = new Socket(hostName, portSendEPCommand);
                 tmOut = new Socket(hostName, portReceiveProcetedTM);
                 pduOut = new Socket(hostName, portReceiveEPReply);
-                tmIn = new Socket(hostName, portRequestTM);
+                tmIn = new ServerSocket(portRequestTM);
+
             }
             catch (UnknownHostException e) {
                 System.out.println("Unknown Host...");
@@ -89,13 +91,29 @@ public class Main {
                 }
             }
         }
+        Socket tmInClient = null;
+        while(tmInClient == null) {
+            try {
+                tmInClient = tmIn.accept();
+            }
+            catch (IOException e) {
+                System.out.println("Waiting for TM connection...");
+                System.out.println("Trying again in 10 seconds...");
+                try {
+                    Thread.sleep(10000);
+                }
+                catch (Exception i) {
+                    i.printStackTrace();
+                }
+            }
+        }
         try {
 
             tcInstream = tcIn.getInputStream();
             pduInstream = pduIn.getInputStream();
             tmOutStream = tmOut.getOutputStream();
             pduOutStream = pduOut.getOutputStream();
-            tmInstrream = tmIn.getInputStream();
+            tmInstrream = tmInClient.getInputStream();
             int active = 50;
             Map<Byte, byte[]> masterKeys = masterKeys();
             Map<Byte, byte[]> sessionKeys = sessionKeys();
@@ -210,7 +228,8 @@ public class Main {
             for(int i = 0; i < 20; i++) {
                 if (scanner.hasNextLine()) scanner.nextLine();
             }
-            while(scanner.hasNextByte() && keyID < 40) {
+            //reads until keyId 29
+            while(scanner.hasNextByte() && keyID < 30) {
                 byte[] currKey = new byte[32];
                 for(int i = 0; i < 32; i++) {
                     currKey[i] = scanner.nextByte();

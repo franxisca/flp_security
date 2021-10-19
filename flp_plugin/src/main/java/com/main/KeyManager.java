@@ -330,11 +330,18 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             System.out.println(Arrays.toString(d.iv));
             System.out.println("got ciphertext");
             System.out.println(Arrays.toString(d.cipherText));
-            byte[] iv = new byte[16];
-            System.arraycopy(d.iv, 0, iv, 0, d.iv.length);
-            byte[] plain = decrypt(d.cipherText, d.masterKey, d.iv);
+            /*byte[] iv = new byte[16];
+            System.arraycopy(d.iv, 0, iv, 0, d.iv.length);*/
+            //TODO
+            byte[] authOnly = new byte[d.iv.length + 1];
+            authOnly[0] = d.masterId;
+            System.arraycopy(d.iv, 0, authOnly, 1, d.iv.length);
+            System.out.println("authenticated data");
+            System.out.println(Arrays.toString(authOnly));
+            byte[] plain = decrypt(d.cipherText, d.masterKey, d.iv, authOnly);
             System.out.println("try to decrypt");
             System.out.println(Arrays.toString(plain));
+            //TODO: check increment
             for(int i = 0; i < plain.length; i++) {
                 byte keyId = plain[i];
                 i++;
@@ -378,11 +385,13 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
     }
 
     //tag is appended to ciphertext for decryption
-    private static byte[] decrypt(byte[] cipherText, byte[] masterKey, byte[] iv) throws Exception {
+    private static byte[] decrypt(byte[] cipherText, byte[] masterKey, byte[] iv, byte[] addAuth) throws Exception {
+        //byte[] iV = new byte[iv.length + 4];
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         SecretKey secretKey = new SecretKeySpec(masterKey, "AES");
         GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
         cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmParameterSpec);
+        cipher.updateAAD(addAuth);
         return cipher.doFinal(cipherText);
     }
 

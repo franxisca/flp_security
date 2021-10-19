@@ -503,15 +503,16 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         /*System.out.println("test spi on rekey");
         System.out.println(sPi);*/
         byte keyId = r.value[2];
+        byte redundant = r.value[3];
         byte[] arc = new byte[4];
         byte[] iv = new byte[12];
         int j = 0;
-        for (int i = 3; i < 7; i++) {
+        for (int i = 4; i < 8; i++) {
             arc[j] = r.value[i];
             j++;
         }
         j = 0;
-        for (int i = 7; i < r.value.length; i++){
+        for (int i = 8; i < r.value.length; i++){
             iv[j] = r.value[i];
             j++;
         }
