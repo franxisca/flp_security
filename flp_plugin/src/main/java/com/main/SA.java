@@ -177,6 +177,14 @@ public class SA extends AbstractBehavior<SA.Command> {
 
     }
 
+    public static final class ARCUpdate implements Command {
+        final byte[] arc;
+
+        public ARCUpdate(byte[] arc) {
+            this.arc = arc;
+        }
+    }
+
     public static Behavior<Command> create(short sPi, int authMaskLength, byte[] authBitMask, boolean critical, byte keyId) {
         return Behaviors.setup(context -> new SA(context, sPi, authMaskLength, authBitMask, critical, keyId));
     }
@@ -266,6 +274,7 @@ public class SA extends AbstractBehavior<SA.Command> {
                 .onMessage(GetTMInfo.class, this::onTM)
                 .onMessage(ArcIncrement.class, this::onARC)
                 .onMessage(IvIncrement.class, this::onIV)
+                .onMessage(ARCUpdate.class, this::onArcUpdate)
                 .build();
     }
 
@@ -505,7 +514,7 @@ public class SA extends AbstractBehavior<SA.Command> {
             tc.tcProc.tell(new TCProcessor.BadSA(this.sPi, tc.secHeader, tc.parent));
         }*/
         else {
-            tc.keyMan.tell(new KeyManager.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, this.keyId, this.aRC, this.authBitMask, this.sPi));
+            tc.keyMan.tell(new KeyManager.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, this.keyId, this.aRC, this.authBitMask, this.sPi, getContext().getSelf()));
         }
         return this;
     }
@@ -553,6 +562,11 @@ public class SA extends AbstractBehavior<SA.Command> {
         if(!inc) {
             getContext().getLog().info("could not increment iv for spi" + this.sPi);
         }
+        return this;
+    }
+
+    private Behavior<Command> onArcUpdate(ARCUpdate arc) {
+        this.aRC = arc.arc;
         return this;
     }
 }

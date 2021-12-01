@@ -182,8 +182,9 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         final byte[] arc;
         final byte[] authMask;
         final short sPi;
+        final ActorRef<SA.Command> saActor;
 
-        public GetTCInfo(/*short sPi, */int vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent, byte keyId, byte[] arc, byte[] authMask, short sPi) {
+        public GetTCInfo(/*short sPi, */int vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent, byte keyId, byte[] arc, byte[] authMask, short sPi, ActorRef<SA.Command> saActor) {
             //this.sPi = sPi;
             this.vcId = vcId;
             this.primHeader = primHeader;
@@ -199,6 +200,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             this.arc = arc;
             this.authMask = authMask;
             this.sPi = sPi;
+            this.saActor = saActor;
         }
     }
 
@@ -336,13 +338,14 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             byte[] authOnly = new byte[d.iv.length + 1];
             authOnly[0] = d.masterId;
             System.arraycopy(d.iv, 0, authOnly, 1, d.iv.length);
-            System.out.println("authenticated data");
-            System.out.println(Arrays.toString(authOnly));
+            //System.out.println("authenticated data");
+            //System.out.println(Arrays.toString(authOnly));
             byte[] plain = decrypt(d.cipherText, d.masterKey, d.iv, authOnly);
-            System.out.println("try to decrypt");
-            System.out.println(Arrays.toString(plain));
-            //TODO: check increment
-            for(int i = 0; i < plain.length; i++) {
+            //System.out.println("try to decrypt");
+            //System.out.println(Arrays.toString(plain));
+            //loop was changed, if something doesn't work check condition and increment
+            int i = 0;
+            while (i < plain.length) {
                 byte keyId = plain[i];
                 i++;
                 byte[] key = new byte[32];
@@ -586,7 +589,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             tc.tcProc.tell(new TCProcessor.BadSA(tc.sPi, tc.secHeader, tc.parent, 12));
         }
         else {
-            keyActor.tell(new Key.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, tc.arc, tc.authMask, tc.sPi));
+            keyActor.tell(new Key.GetTCInfo(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.tcProc, tc.parent, tc.arc, tc.authMask, tc.sPi, tc.saActor));
         }
         return this;
     }

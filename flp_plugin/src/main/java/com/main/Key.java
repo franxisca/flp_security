@@ -159,8 +159,9 @@ public class Key extends AbstractBehavior<Key.Command> {
         final byte[] arc;
         final byte[] authMask;
         final short sPi;
+        final ActorRef<SA.Command> saActor;
 
-        public GetTCInfo(/*short sPi, */int vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent/*, byte keyId*/, byte[] arc, byte[] authMask, short sPi) {
+        public GetTCInfo(/*short sPi, */int vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, ActorRef<TCProcessor.Command> tcProc, ActorRef<Module.Command> parent/*, byte keyId*/, byte[] arc, byte[] authMask, short sPi, ActorRef<SA.Command> saActor) {
             //this.sPi = sPi;
             this.vcId = vcId;
             this.primHeader = primHeader;
@@ -176,6 +177,7 @@ public class Key extends AbstractBehavior<Key.Command> {
             this.arc = arc;
             this.authMask = authMask;
             this.sPi = sPi;
+            this.saActor = saActor;
         }
     }
 
@@ -340,7 +342,7 @@ public class Key extends AbstractBehavior<Key.Command> {
         }*/
         //return keyActor to TCProcessor
         //else {
-            tc.tcProc.tell(new TCProcessor.TC(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.arc, tc.authMask, tc.parent, this.keyId, this.key, tc.sPi));
+            tc.tcProc.tell(new TCProcessor.TC(tc.vcId, tc.primHeader, tc.secHeader, tc.data, tc.dataLength, tc.secTrailer, tc.crc, tc.arc, tc.authMask, tc.parent, this.keyId, this.key, tc.sPi, tc.saActor));
         //}
         return this;
     }

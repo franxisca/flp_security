@@ -19,7 +19,7 @@ public class GuardianActor extends AbstractBehavior<GuardianActor.Command> {
     private static int i = 0;
 
     public static final class Start implements Command {
-        //TODO: make configurable
+        //maybe make configurable
         final int active1;
         final Map<Byte, byte[]> masterKeys;
         final Map<Byte, byte[]> sessionKeys;

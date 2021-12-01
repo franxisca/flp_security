@@ -66,8 +66,9 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         final byte keyId;
         final byte[] key;
         final short sPi;
+        final ActorRef<SA.Command> saActor;
 
-        public TC(int vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, byte[] arc, byte[] authMask, ActorRef<Module.Command> parent, byte keyId, byte[] key, short sPi) {
+        public TC(int vcId, byte[] primHeader, byte[] secHeader, byte[] data, int dataLength, byte[] secTrailer, byte[] crc, byte[] arc, byte[] authMask, ActorRef<Module.Command> parent, byte keyId, byte[] key, short sPi, ActorRef<SA.Command> saActor) {
             this.vcId = vcId;
             this.primHeader = primHeader;
             this.secHeader = secHeader;
@@ -81,6 +82,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
             this.keyId = keyId;
             this.key = key;
             this.sPi = sPi;
+            this.saActor = saActor;
         }
     }
 
@@ -184,7 +186,6 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
             bb.put(tc.arc[2]);
             int tcArc = bb.getInt(0);
             int saArc = bb.getInt(4);
-            //TODO: update arc of SA
             if(tcArc <= saArc) {
                 //this.fsrHandler.tell(new FSRHandler.BadSeq());
                 this.alarmFlag = true;
@@ -197,6 +198,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
                 System.arraycopy(plaintext, 0, secReturn, tc.primHeader.length, plaintext.length);
                 tc.parent.tell(new Module.TCOut(true, (byte) 0b00000000, secReturn, tc.crc));
                 tc.parent.tell(new Module.FSR(this.alarmFlag, false, false, false, tc.sPi, c[3]));
+                tc.saActor.tell(new SA.ARCUpdate(tc.arc));
             }
 
         }
