@@ -184,6 +184,7 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
             bb.put(tc.arc[2]);
             int tcArc = bb.getInt(0);
             int saArc = bb.getInt(4);
+            //TODO: update arc of SA
             if(tcArc <= saArc) {
                 //this.fsrHandler.tell(new FSRHandler.BadSeq());
                 this.alarmFlag = true;

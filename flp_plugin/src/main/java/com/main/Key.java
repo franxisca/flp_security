@@ -359,10 +359,11 @@ public class Key extends AbstractBehavior<Key.Command> {
         byte[] response;
         try {
             response = encrypt(v.challenge, this.key);
-            byte[] reply = new byte[response.length + 2];
-            reply[0] = 0;
-            reply[1] = 0;
-            System.arraycopy(response, 0, reply, 2, response.length);
+            byte[] reply = new byte[response.length + IV_LENGTH + 4];
+            for(int i = 0; i < 16; i++) {
+                reply[i] = 0;
+            }
+            System.arraycopy(response, 0, reply, 16, response.length);
             v.reply.put(this.keyId, reply);
             v.keyMan.tell(new KeyManager.VerifyKey(v.keyToChallenge, v.log, v.replyTo, v.reply, v.secMan));
         }
@@ -378,7 +379,7 @@ public class Key extends AbstractBehavior<Key.Command> {
     private static byte[] encrypt(byte[] challenge, byte[] key) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         SecretKey secretKey = new SecretKeySpec(key, "AES");
-        byte[] iv = new byte[IV_LENGTH];
+        byte[] iv = new byte[IV_LENGTH + 4];
         GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, iv);
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmParameterSpec);
         return cipher.doFinal(challenge);

@@ -647,11 +647,11 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         Map<Byte, byte[]> reply = new HashMap<>();
         //Map<Byte, byte[]> keyToChallenge = new HashMap<>();
         ArrayList<Pair<Byte, byte[]>> keyToChallenge = new ArrayList<>();
-        byte[] challenge = new byte[2];
+        byte[] challenge = new byte[16];
         for(int i = 0; i < k.value.length; i++) {
             byte keyId = k.value[i];
             i++;
-            for (int j = 0; j < 2; j++) {
+            for (int j = 0; j < 16; j++) {
                 challenge[j] = k.value[i];
                 i++;
             }
@@ -734,16 +734,16 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
         for(Map.Entry<Byte, byte[]> entry : k.reply.entrySet()) {
             length++;
             length = (short) (length + entry.getValue().length);
-            length = (short) (length + IV_LENGTH);
+            //length = (short) (length + IV_LENGTH);
         }
         ArrayList<Byte> temp = new ArrayList<>();
         byte[] value = new byte[length];
         for(Map.Entry<Byte, byte[]> entry : k.reply.entrySet()) {
             temp.add(entry.getKey());
-            for(int i = 0; i < IV_LENGTH; i++) {
+            /*for(int i = 0; i < IV_LENGTH; i++) {
                 byte zero = 0;
                 temp.add(zero);
-            }
+            }*/
             for(int i = 0; i < entry.getValue().length; i++) {
                 temp.add(entry.getValue()[i]);
             }
