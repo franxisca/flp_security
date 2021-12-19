@@ -633,9 +633,9 @@ public class PDUManager extends AbstractBehavior<PDUManager.Command> {
     private Behavior<Command> onInventory(KeyInventory k){
         byte firstKey = k.value[0];
         byte lastKey = k.value[1];
-        System.out.println("test key inventory values");
+        /*System.out.println("test key inventory values");
         System.out.println(firstKey);
-        System.out.println(lastKey);
+        System.out.println(lastKey);*/
         Map<Byte, KeyState> reply = new HashMap<>();
         k.keyMan.tell(new KeyManager.KeyInventory(firstKey, lastKey, k.log, getContext().getSelf(), k.secMan, (short) 0, reply, firstKey));
         return this;

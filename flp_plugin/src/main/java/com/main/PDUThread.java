@@ -38,9 +38,10 @@ public class PDUThread extends Thread{
                     pdu[1] = (byte) ((lengthInByte >> 8) & 0xff);
                     pdu[2] = (byte) (lengthInByte & 0xff);
                     System.arraycopy(value, 0, pdu, 3, value.length);
-                    System.out.println("Received PDU");
-                    System.out.println("Length: " + (len + 3));
-                    System.out.println(Arrays.toString(pdu));
+                    System.out.println("Received PDU with length: " + (len + 3));
+                    //System.out.println("Length: " + (len + 3));
+                    //System.out.println(Arrays.toString(pdu));
+                    System.out.println("PDU: " + toHex(pdu));
                     mainActor.tell(new GuardianActor.PDU(pdu));
                 }
                 Thread.sleep(5000);
@@ -51,5 +52,12 @@ public class PDUThread extends Thread{
                 e.printStackTrace();
             }
         }
+    }
+    private String toHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for(byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
     }
 }

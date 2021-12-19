@@ -158,8 +158,8 @@ public class SecurityManager extends AbstractBehavior<SecurityManager.Command> {
         bb.put(p.pdu[1]);
         bb.put(p.pdu[2]);
         short length = bb.getShort(0);
-        System.out.println("received length:");
-        System.out.println(length);
+        //System.out.println("received length:");
+        //System.out.println(length);
         byte[] value = new byte[length];
         for (int i = 0; i < length; i++) {
             value[i] = p.pdu[i + 3];

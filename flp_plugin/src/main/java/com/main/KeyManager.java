@@ -326,12 +326,12 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         //decryption worked
         //assumes decryption returns plain text only
         try {
-            System.out.println("got master key");
+            /*System.out.println("got master key");
             System.out.println(Arrays.toString(d.masterKey));
             System.out.println("got iv");
             System.out.println(Arrays.toString(d.iv));
             System.out.println("got ciphertext");
-            System.out.println(Arrays.toString(d.cipherText));
+            System.out.println(Arrays.toString(d.cipherText));*/
             /*byte[] iv = new byte[16];
             System.arraycopy(d.iv, 0, iv, 0, d.iv.length);*/
             //TODO
@@ -356,6 +356,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
                 ActorRef<Key.Command> keyActor = this.keyIdToActor.get(keyId);
                 //keyActor already exists
                 if(keyActor != null) {
+                    System.out.println("Key could not be uploaded, key with ID " + keyId + " already exists");
                     byte tag = (byte) 0b00000001;
                     short length = 1;
                     byte[] value = new byte[1];
@@ -365,6 +366,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
                 //create new keyActor, log it
                 else {
                     keyActor = getContext().spawn(Key.create(keyId, key, false), "keyActor" + keyId);
+                    System.out.println("Successfully uploaded key with ID " + keyId);
                     this.keyIdToActor.put(keyId, keyActor);
                     byte tag = (byte) 0b10000001;
                     short length = 1;
@@ -376,6 +378,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
         }
         //error in key decryption
         catch (Exception e) {
+            System.out.println("Error in OTAR key decryption");
             byte tag = (byte) 0b00010001;
             //byte tag = -1;
             short length  = 1;
@@ -496,14 +499,14 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
                 value[i] = entry.getValue().toByte();
                 i++;
             }
-            System.out.println("got here!");
+            //System.out.println("got here!");
             k.log.tell(new Log.InsertEntry(tag, length, value));
             k.pum.tell(new PDUManager.KeyInventoryReply(k.number, k.keyIdToState, k.secMan));
         }
         //found a keyActor to check
         else {
-            System.out.println("found keys to check");
-            System.out.println(k.currKey);
+            //System.out.println("found keys to check");
+            //System.out.println(k.currKey);
             k.number ++;
             k.currKey++;
             keyActor.tell(new Key.KeyInventory(k.number, k.firstKey, k.lastKey, k.currKey, k.keyIdToState, k.pum, k.secMan, k.log, getContext().getSelf()));
@@ -569,7 +572,7 @@ public class KeyManager extends AbstractBehavior<KeyManager.Command> {
             short length = 1;
             byte[] value = new byte[1];
             value[0] = k.keyId;
-            System.out.println("key destruction successful");
+            System.out.println("Key destruction successful for key with ID " + k.keyId);
             k.log.tell(new Log.InsertEntry(tag, length, value));
             try {
                 Thread.sleep(3000);

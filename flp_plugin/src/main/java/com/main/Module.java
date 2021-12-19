@@ -296,8 +296,8 @@ public class Module extends AbstractBehavior<Module.Command> {
     }
 
     private Behavior<Command> onTM (GetTMInfo tm) {
-        System.out.println("channel id to get default SA");
-        System.out.println(tm.channel);
+        //System.out.println("channel id to get default SA");
+        //System.out.println(tm.channel);
         //no SA active on this channel, use default SA
         if(!this.vcIdToSA.containsKey(tm.channel)) {
             short sPi = this.vcIdToDefaultSA.get(tm.channel);
@@ -334,12 +334,15 @@ public class Module extends AbstractBehavior<Module.Command> {
 
     private Behavior<Command> onTCOut(TCOut tc) {
         //TODO
+        System.out.println("Processed TC Frame with verification status:");
         System.out.println(tc.verificationStatus);
+        System.out.println("verification status code:");
         System.out.println(tc.verStatCode);
         //System.out.println(Arrays.toString(tc.secReturn));
         byte[] ret = new byte[tc.secReturn.length + tc.crc.length];
         System.arraycopy(tc.secReturn, 0, ret, 0, tc.secReturn.length);
         System.arraycopy(tc.crc, 0, ret, tc.secReturn.length, tc.crc.length);
+        System.out.println("Decrypted Frame:");
         System.out.println(toHex(ret));
         this.tcOut.tell(new TCOutstream.TC(tc.verificationStatus, tc.verStatCode, tc.secReturn));
         return this;

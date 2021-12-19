@@ -216,11 +216,11 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
 
     //authentication bitmask is not handled but is all ones anyway
     private static byte[] decrypt(byte[] key, byte[] iv, byte[] data, byte[] tag, byte[] authMask, byte[] authOnly) throws Exception {
-        System.out.println("Decryption Key: " + Arrays.toString(key));
+        /*System.out.println("Decryption Key: " + Arrays.toString(key));
         System.out.println("Decryption IV: " + Arrays.toString(iv));
         System.out.println("Ciphertext: " + Arrays.toString(data));
         System.out.println("MAC: " + Arrays.toString(tag));
-        System.out.println("Authenticated Data: " + Arrays.toString(authOnly));
+        System.out.println("Authenticated Data: " + Arrays.toString(authOnly));*/
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         SecretKey secretKey = new SecretKeySpec(key, "AES");
         byte[] cipherText = new byte[data.length + tag.length];
@@ -242,8 +242,9 @@ public class TCProcessor extends AbstractBehavior<TCProcessor.Command> {
         this.lastArc = arc[3];
         b.parent.tell(new Module.TCOut(false, (byte) 0b00000001, null, null));
         b.parent.tell(new Module.FSR(this.alarmFlag, false, false, true, b.sPi, this.lastArc));
-        System.out.println("Bad SA code");
-        System.out.println(b.code);
+        System.out.println("Decryption failed, bad SA failure.");
+        System.out.println("Bad SA code: " + b.code);
+        //System.out.println(b.code);
         return this;
     }
 

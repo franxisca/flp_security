@@ -315,9 +315,9 @@ public class SA extends AbstractBehavior<SA.Command> {
         if(this.state != SAState.UNKEYED) {
             byte tag = (byte) 0b00000110;
             r.log.tell(new Log.InsertEntry(tag, length, value));
-            System.out.println("test spi byte order");
+            /*System.out.println("test spi byte order");
             System.out.println(value[0]);
-            System.out.println(value[1]);
+            System.out.println(value[1]);*/
         }
         else {
             this.keyId = r.keyId;

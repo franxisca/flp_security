@@ -46,9 +46,13 @@ public class TCThread extends Thread {
                     System.arraycopy(frameHeader, 0, tc, 0, frameHeader.length);
                     byte[] frame = this.stream.readNBytes(lengthSec - frameHeader.length);
                     System.arraycopy(frame, 0, tc, frameHeader.length, frame.length);
-                    System.out.println("Received TC");
+                    System.out.println("Received TC Frame with length: " + frame.length);
+                    //System.out.println("Length: " + lengthSec);
+                    System.out.println("Encrypted Frame: ");
+                    System.out.println(toHex(tc));
+                    /*System.out.println("Received TC");
                     System.out.println("Length: " + lengthSec);
-                    System.out.println(Arrays.toString(tc));
+                    System.out.println(Arrays.toString(tc));*/
                     mainActor.tell(new GuardianActor.TC(tc));
                     //assumes TC frame length includes header and trailer
                     Thread.sleep(5000);
@@ -60,5 +64,12 @@ public class TCThread extends Thread {
             }
         }
 
+    }
+    private String toHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for(byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
     }
 }

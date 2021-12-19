@@ -266,7 +266,7 @@ public class Key extends AbstractBehavior<Key.Command> {
             byte tag = (byte) 0b10000010;
             this.keyState = KeyState.ACTIVE;
             a.log.tell(new Log.InsertEntry(tag,length, value));
-            System.out.println("key activation successful " + this.keyId);
+            System.out.println("Key activation successful for key with ID" + this.keyId);
             //System.out.println(this.keyId);
         }
         return this;
@@ -290,7 +290,7 @@ public class Key extends AbstractBehavior<Key.Command> {
             byte tag = (byte) 0b10000011;
             this.keyState = KeyState.DEACTIVATED;
             d.log.tell(new Log.InsertEntry(tag, length, value));
-            System.out.println("key deactivation successful " + this.keyId);
+            System.out.println("Key deactivation successful for key with ID" + this.keyId);
         }
         return this;
     }

@@ -164,9 +164,10 @@ public class Main {
                     tc[i] = (byte) data;
                     data = in.read();
                 }
-                System.out.println("Received TC");
-                System.out.println("Length: " + lengthSec);
-                System.out.println(Arrays.toString(tc));
+                System.out.println("Received TC Frame with length: " + lengthSec);
+                //System.out.println("Length: " + lengthSec);
+                System.out.println("Encrypted Frame: ");
+                System.out.println(toHex(tc));
                 //mainActor.tell(new GuardianActor.TC(tc));
                 return tc;
             }
@@ -176,6 +177,14 @@ public class Main {
             System.out.println("Could not read TC");
         }
         return null;
+    }
+
+    private static String toHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for(byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
     }
 
 
@@ -591,7 +600,7 @@ public class Main {
         }
         mainActor.tell(new GuardianActor.TM(tm));
         for(int i = 0; i < 32; i++) {
-            System.out.println(tm[i]);
+            //System.out.println(tm[i]);
         }
     }
 }
